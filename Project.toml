@@ -1,0 +1,4 @@
+name = "EAGO_Differential"
+uuid = "544368f2-353a-11e9-18e2-710fdc2698d4"
+authors = ["Matthew Wilhelm <matthew.wilhelm@uconn.edu>"]
+version = "0.1.0"
