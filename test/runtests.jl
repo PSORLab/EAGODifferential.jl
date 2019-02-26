@@ -73,6 +73,5 @@ using EAGO, EAGO_Differential
 end
 
 include("lower_evaluator_tests.jl")
-#include("upper_evaluator_tests.jl")
-#include("parametic_interval_test.jl")
-#include("global_optimization.jl")
+include("upper_evaluator_tests.jl")
+include("core_optimizer_test.jl")

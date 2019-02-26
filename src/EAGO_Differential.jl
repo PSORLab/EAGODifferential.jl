@@ -12,6 +12,6 @@ module EAGO_Differential
 
     include("src/lower_evaluator/lower_evaluator.jl")
     include("src/upper_evaluator/upper_evaluator.jl")
-    #include("src/solve_ode.jl")
+    include("src/solve_ode.jl")
 
 end # module
