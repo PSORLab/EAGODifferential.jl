@@ -43,6 +43,14 @@ mutable struct ImplicitODEUpperEvaluator <: MOI.AbstractNLPEvaluator
     inclusion_flag::Bool
     extended_division_flag::Bool
 
+    inc::Vector{Bool}
+    incLow::Vector{Bool}
+    incHigh::Vector{Bool}
+
+    N::Vector{EAGO.IntervalType}
+    Xi::Vector{EAGO.IntervalType}
+    X1::Vector{EAGO.IntervalType}
+
     # timer
     eval_objective_timer::Float64
     eval_constraint_timer::Float64
@@ -95,6 +103,14 @@ mutable struct ImplicitODEUpperEvaluator <: MOI.AbstractNLPEvaluator
         d.disable_1storder = false
         d.disable_2ndorder = true
         d.has_nlobj = false
+
+        d.inc = fill(false, (1,))
+        d.incLow = fill(false, (1,))
+        d.incHigh = fill(false, (1,))
+
+        d.N = fill(EAGO.IntervalType(0.0), (1,))
+        d.X1 = fill(EAGO.IntervalType(0.0), (1,))
+        d.Xi = fill(EAGO.IntervalType(0.0), (1,))
 
         d.kmax = 10
         d.etol = 1E-12
@@ -175,17 +191,11 @@ function EAGO.build_evaluator!(d::ImplicitODEUpperEvaluator, f::Function, h::Fun
     if (nx == 1)
         d.state_relax_1 = fill(temp, (nt-1,))
     else
-        d.state_relax_n = fill(temp, (nt-1,nx))
+        d.state_relax_n = fill(temp, (nx, nt-1))
     end
-
-    d.pref_mc = fill(temp, (np,))
 
     # storage for intermediate calculations
     d.IC_relaxations = fill(temp, (nx,))
-    d.xa_mc = fill(temp, (nx,))
-    d.xA_mc = fill(temp, (nx,))
-    d.z_mc = fill(temp, (nx,))
-    d.aff_mc = fill(temp, (nx,))
     d.H = fill(temp, (nx,))
     if (nx > 1)
         d.J = zeros(EAGO.IntervalType, nx, nx)
@@ -201,6 +211,14 @@ function EAGO.build_evaluator!(d::ImplicitODEUpperEvaluator, f::Function, h::Fun
     end
 
     d.X = fill(IntervalType(0.0), (nx, nt-1))
+    d.N = fill(IntervalType(0.0), (nx,))
+    d.X1 = fill(IntervalType(0.0), (nx,))
+    d.Xi = fill(IntervalType(0.0), (nx,))
+
+    d.inc = fill(false, (nx,))
+    d.incLow = fill(false, (nx,))
+    d.incHigh = fill(false, (nx,))
+
     indx = 1
     for i in 1:(nt-1)
         for j in 1:nx
@@ -208,10 +226,6 @@ function EAGO.build_evaluator!(d::ImplicitODEUpperEvaluator, f::Function, h::Fun
         end
         indx += 1
     end
-
-    # allocates the reference points
-    d.last_p = zeros(Float64, np); fill!(d.last_p, NaN)
-    d.ref_p = zeros(Float64, np)
 end
 
 function EAGO.set_current_node!(x::ImplicitODEUpperEvaluator,n::NodeBB)

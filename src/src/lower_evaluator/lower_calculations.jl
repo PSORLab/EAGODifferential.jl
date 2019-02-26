@@ -9,9 +9,13 @@ function relax_ode_implicit!(d::ImplicitODELowerEvaluator, y)
     lower_var_bnds = d.current_node.lower_variable_bounds
     upper_var_bnds = d.current_node.upper_variable_bounds
     # Generate new parameters for implicit relaxation if necessary
-    if ~EAGO.same_box(d.current_node, d.last_node, 0.0)
 
-        println("generate parameters")
+    current_node = d.current_node
+    last_node = d.last_node
+    new_box_flag = ~EAGO.same_box(d.current_node, d.last_node, 0.0)
+    if new_box_flag
+
+        println("GENERATED PARAMETERS")
         d.last_node = d.current_node
         d.obj_eval = false
         d.cnstr_eval = false
@@ -135,9 +139,9 @@ function relax_ode_implicit!(d::ImplicitODELowerEvaluator, y)
             t[1] = d.ivp.time[2]
             println("relax time t[1] == $(t[1])")
             implicit_relax_h!(d.state_fun[1], d.state_jac_fun[1], d.var_relax, d.pref_mc,
-                              d.IC_relaxations, view(d.state_relax_1, 1:1),
+                              d.IC_relaxations, view(d.state_relax_1, 1:nx, 1:1),
                               d.xa_mc, d.xA_mc, d.z_mc, d.aff_mc, d.X[1:nx,1],
-                              d.P, d.opts, view(d.state_ref_relaxation_1, 1:kmax, 1:1),
+                              d.P, d.opts, view(d.state_ref_relaxation_1, 1:1, 1:kmax, 1:1),
                               d.H, d.J, d.Y, true, t, true)
 
             s = 1
@@ -161,7 +165,7 @@ function relax_ode_implicit!(d::ImplicitODELowerEvaluator, y)
                 implicit_relax_h!(d.state_fun[s], d.state_jac_fun[s], d.var_relax, d.pref_mc,
                                   x0, view(d.state_relax_1, i:i), d.xa_mc, d.xA_mc,
                                   d.z_mc, d.aff_mc, d.X[1:nx,i], d.P, d.opts,
-                                  view(d.state_ref_relaxation_1, 1:kmax, i:i),
+                                  view(d.state_ref_relaxation_1, 1:1, 1:kmax, i:i),
                                   d.H, d.J, d.Y, true, t, true)
             end
         else
