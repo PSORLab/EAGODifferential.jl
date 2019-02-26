@@ -51,3 +51,17 @@ EAGO_Differential.relax_ode_implicit!(upper_eval, y)
 
 x = EAGO.Optimizer()
 EAGO_Differential.interval_preprocess_ode(x, y)
+
+#=
+opt = EAGO.Optimizer()
+
+EAGO_Differential.interval_preprocess_ode!(opt, y)
+postpre = deepcopy(y)
+
+nmid = create_mid_node(y, nx, np, nt)
+
+EAGO_Differential.midpoint_upper_bnd_ode!(opt, y)
+postubd = deepcopy(y)
+
+EAGO_Differential.solve_ode(f, h, hj, g, x0, xL, xU, pL, pU, t_start, t_end, nt, s, method, opt)
+=#

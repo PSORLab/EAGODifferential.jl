@@ -17,14 +17,14 @@
 
     t_start = 0.0
     t_end = 1.0
-    x0 = [1.0]
     method = :BDF
+    x0(p) = [1.0]
 
     pL = [-20.0]; pU = [-10.0]
     xL = [-0.12]; xU = [-0.04]
 
     # build the basic evaluator (w/o inequality constraints)
-    build_evaluator!(lower_eval, f, h, np, nx, nt, s, t_start, t_end, x0, method, pL, pU, xL, xU; hj = hj)
+    build_evaluator!(lower_eval, f, h, np, nx, nt, s, t_start, t_end, method, pL, pU, xL, xU, x0; hj = hj)
 
     # update the node info for the evaluator to initial node
     n1 = EAGO.NodeBB(Float64[-0.12,-20.0], Float64[-0.04,-10.0], -3.4, 2.1, 2, 1, true)
@@ -57,18 +57,12 @@
     @test lower_eval.ivp.step_size == 1.0/(99)
     @test lower_eval.ivp.time_start == 0.0
     @test lower_eval.ivp.time_end == 1.0
-    @test lower_eval.ivp.initial_values[1] == 1.0
-
-    @test lower_eval.IC_relaxations[1].cc == 1.0
-    @test lower_eval.IC_relaxations[1].cv == 1.0
-    @test lower_eval.IC_relaxations[1].Intv.lo == 1.0
-    @test lower_eval.IC_relaxations[1].Intv.hi == 1.0
 
     @test lower_eval.has_ineq == false
 
     # build evaluator w/ equality constaints
     g(x,p,t) = [x[1][1] + p[1]; p[1]+t[1]];
-    build_evaluator!(lower_eval, f, h, np, nx, nt, s, t_start, t_end, x0, method, pL, pU, xL, xU; g = g, hj = hj)
+    build_evaluator!(lower_eval, f, h, np, nx, nt, s, t_start, t_end, method, pL, pU, xL, xU, x0; g = g, hj = hj)
     @test lower_eval.has_ineq == true
     @test lower_eval.ng == 2
 
@@ -143,24 +137,31 @@ end
 
     t_start = 0.0
     t_end = 1.0
-    x0 = [1.0]
+    x0(p) = [1.0]
     method = :BDF
 
     pL = [-20.0]; pU = [-10.0]
     xL = [0.00]; xU = [1.00]
 
     # build the basic evaluator (w/o inequality constraints)
-    EAGO_Differential.build_evaluator!(lower_eval, f, h, np, nx, nt, s, t_start, t_end, x0, method, pL, pU, xL, xU; hj = hj)
+    EAGO_Differential.build_evaluator!(lower_eval, f, h, np, nx, nt, s, t_start, t_end, method, pL, pU, xL, xU, x0; hj = hj)
 
     y = [-16.0]
     EAGO_Differential.relax_ode_implicit!(lower_eval, y)
+    # TODO: Add additional checks and checks for each method order...
+
+    @test lower_eval.IC_relaxations[1].cc == 1.0
+    @test lower_eval.IC_relaxations[1].cv == 1.0
+    @test lower_eval.IC_relaxations[1].Intv.lo == 1.0
+    @test lower_eval.IC_relaxations[1].Intv.hi == 1.0
 end
 
 #=
 @testset "Lower Relaxation Calculation Routines (3D)" begin
     EAGO_Differential.relax_ode_implicit!(lower_eval, y)
 end
-
+=#
+#=
 @testset "Lower Evaluator MOI Wrapper" begin
 
     lower_eval = ImplicitODELowerEvaluator{2}()
@@ -168,41 +169,43 @@ end
     f_3(x,p,t) = 3.0*x[1]
     g_3(x,p,t) = [2.0*x[2]; 3.0*x[2]]
 
-    #= TODO
-    function h_3!(H,x,xp,p,t)
+    function h_3!(H,x,p,t)
+        H[1] = -x[1] - p[1]
+        H[2] = -x[2] - p[2]
     end
-    function hj_3!(J,x,xp,p,t)
+    function hj_3!(J,x,p,t)
+        J[1,1] = -one(p[1])
+        J[1,2] = zero(p[1])
+        J[2,1] = zero(p[1])
+        J[2,2] = -one(p[1])
     end
-    =#
 
     np = 2
     nx = 2
-    nt = 100
+    nt = 2
     s = 2
     t_start = 0.0
     t_end = 1.0
-    x0 = [1.5, 2.2]
+    x0(p) = [1.5, 2.2]
     method = :BDF
 
-    #= TODO
-    pL = [-20.0; -20.0]
+    pL = [-15.0; -20.0]
     pU = [-10.0; -10.0]
     xL = [-0.12; -0.12]
     xU = [-0.04; -0.04]
 
     build_evaluator!(lower_eval, f_3, h_3!, np, nx, nt, s, t_start, t_end,
-                     x0, method, pL, pU, xL, xU; g = g_3, hj = hj_3!)
-    =#
+                     method, pL, pU, xL, xU, x0; g = g_3, hj = hj_3!)
 
     # update the node info for the evaluator to initial node
-    n1 = EAGO.NodeBB(Float64[-0.12,-20.0], Float64[-0.04,-10.0], -3.4, 2.1, 2, 1, true)
+    n1 = EAGO.NodeBB(Float64[-0.12,-0.12,-15.0,-20.0], Float64[-0.04,-0.04,-10.0,-10.0], -3.4, 2.1, 2, 1, true)
     EAGO.set_current_node!(lower_eval, n1)
 
-    #y = [] TODO
-    #w = [] TODO
+    y = [-0.08; -0.07; -12.0; -11.0]
+    w = [1.0; 2.0; 3.0; 4.0]
 
     fval = MOI.eval_objective(lower_eval, y)
-    #@test fval == 1 # TODO
+    @test fval == 1
 
     g = zeros[2]
     MOI.eval_constraint(lower_eval, g, y)
@@ -224,15 +227,15 @@ end
     @test jacobian_structure[4][1] == 2
     @test jacobian_structure[4][2] == 2
 
-    @test_throws MOI.hessian_lagrangian_structure(lower_eval)
-    @test_throws EAGO_Differential._hessian_lagrangian_structure(lower_eval)
+    @test_throws ErrorException MOI.hessian_lagrangian_structure(lower_eval)
+    @test_throws ErrorException EAGO_Differential._hessian_lagrangian_structure(lower_eval)
 
     g = zeros[2,2]
     MOI.eval_constraint_jacobian(lower_eval, g, y)
-    #@test g[1,1] == 0.0 TODO
-    #@test g[1,2] == 0.0 TODO
-    #@test g[2,1] == 0.0 TODO
-    #@test g[2,2] == 0.0 TODO
+    @test g[1,1] == 0.0
+    @test g[1,2] == 0.0
+    @test g[2,1] == 0.0
+    @test g[2,2] == 0.0
 
     out = zeros[2]
     MOI.eval_constraint_jacobian_product(lower_eval, out, y, w)
@@ -249,9 +252,9 @@ end
     @test features[2] == :Jac
 
     requested_features = Symbol[]
-    @test_nowarn MOI.initialize(lower_eval, requested_features)
+    @test_nowarn (MOI.initialize(lower_eval, requested_features))
 
-    @test_throws ErrorException MOI.objective_expr(lower_eval)
-    @test_throws ErrorException MOI.constraint_expr(lower_eval)
+    @test_warn "EAGO.ImplicitODELowerEvaluator doesn't provide expression graphs of constraint functions." MOI.objective_expr(lower_eval)
+    @test_warn "EAGO.ImplicitODELowerEvaluator doesn't provide expression graphs of constraint functions." MOI.constraint_expr(lower_eval)
 end
 =#

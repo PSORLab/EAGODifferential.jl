@@ -6,12 +6,14 @@ function interval_preprocess_ode!(x::EAGO.Optimizer, y::EAGO.NodeBB)
     evaluator = x.nlp_data.evaluator
     nx = evaluator.nx
     np = evaluator.np
-    nt = evaluator.nt
+    nt = evaluator.ivp.time_steps
 
     set_current_node!(evaluator, y)
+    yval = (y.lower_variable_bounds + y.upper_variable_bounds)/2.0
+    relax_ode_implicit!(evaluator, yval)
 
     g = zeros(evaluator.ng)
-    MOI.eval_constraint(evaluator, g, y)
+    MOI.eval_constraint(evaluator, g, yval)
     Eflag = evaluator.exclusion_flag
     if ~Eflag
         EFlag = any(i-> (i > 0), g)
@@ -36,7 +38,7 @@ function create_mid_node(y::NodeBB, nx::Int, np::Int, nt::Int)
     lower_variable_bounds = y.lower_variable_bounds
     upper_variable_bounds = y.upper_variable_bounds
 
-    P_interval = EAGO.IntervalType.(lower_variable_bounds[(nx*(nt-1)+1):(nx*(nt-1)+np)]
+    P_interval = EAGO.IntervalType.(lower_variable_bounds[(nx*(nt-1)+1):(nx*(nt-1)+np)],
                                     upper_variable_bounds[(nx*(nt-1)+1):(nx*(nt-1)+np)])
     P_mid_interval = EAGO.IntervalType.(mid.(P_interval))
 
@@ -56,7 +58,7 @@ function midpoint_upper_bnd_ode!(x::EAGO.Optimizer, y::NodeBB)
         evaluator = x.nlp_data.evaluator
         nx = evaluator.nx
         np = evaluator.np
-        nt = evaluator.nt
+        nt = evaluator.ivp.time_steps
 
         node_ymid = create_mid_node(y, nx, np, nt)
         set_current_node!(evaluator, node_ymid)

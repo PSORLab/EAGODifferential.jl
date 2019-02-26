@@ -2,7 +2,8 @@
 
 #using Compat
 using Compat.Test
-using EAGO, EAGO_Differential
+using EAGO, EAGO_Differential, MathOptInterface
+const MOI = MathOptInterface
 
 @testset "Kernel and Jacobians" begin
 

@@ -17,14 +17,14 @@
 
     t_start = 0.0
     t_end = 1.0
-    x0 = [1.0]
+    x0(p) = [1.0]
     method = :BDF
 
     pL = [-20.0]; pU = [-10.0]
     xL = [-0.12]; xU = [-0.04]
 
     # build the basic evaluator (w/o inequality constraints)
-    build_evaluator!(upper_eval, f, h, np, nx, nt, s, t_start, t_end, x0, method, pL, pU, xL, xU; hj = hj)
+    build_evaluator!(upper_eval, f, h, np, nx, nt, s, t_start, t_end, method, pL, pU, xL, xU,  x0; hj = hj)
 
     # update the node info for the evaluator to initial node
     n1 = EAGO.NodeBB(Float64[-0.12,-20.0], Float64[-0.04,-10.0], -3.4, 2.1, 2, 1, true)
@@ -57,18 +57,12 @@
     @test upper_eval.ivp.step_size == 1.0/(99)
     @test upper_eval.ivp.time_start == 0.0
     @test upper_eval.ivp.time_end == 1.0
-    @test upper_eval.ivp.initial_values[1] == 1.0
-
-    @test upper_eval.IC_relaxations[1].cc == 1.0
-    @test upper_eval.IC_relaxations[1].cv == 1.0
-    @test upper_eval.IC_relaxations[1].Intv.lo == 1.0
-    @test upper_eval.IC_relaxations[1].Intv.hi == 1.0
 
     @test upper_eval.has_ineq == false
 
     # build evaluator w/ equality constaints
     g(x,p,t) = [x[1][1] + p[1]; p[1]+t[1]];
-    build_evaluator!(upper_eval, f, h, np, nx, nt, s, t_start, t_end, x0, method, pL, pU, xL, xU; g = g, hj = hj)
+    build_evaluator!(upper_eval, f, h, np, nx, nt, s, t_start, t_end, method, pL, pU, xL, xU,  x0; g = g, hj = hj)
     @test upper_eval.has_ineq == true
     @test upper_eval.ng == 2
 
@@ -79,55 +73,48 @@ end
 
 @testset "Upper Evaluator - Relax Objective/Constraint" begin
     # soft build, then evaluate
-    upper_eval = ImplicitODELowerEvaluator{2}()
+    upper_eval = ImplicitODEUpperEvaluator()
 
     f(x,p,t) = x[1][1]
     g(x,p,t) = [3.0*x[1][1]]
 
     upper_eval.np = 2
-    upper_eval.var_relax = [MC{2}(1.0, 2.4);  MC{2}(1.0, 2.4)]
-    upper_eval.state_relax_n = fill(MC{2}(1.1, 2.1),(2,2,))
+    upper_eval.var_relax = [EAGO.IntervalType(1.0, 2.4);  EAGO.IntervalType(1.0, 2.4)]
+    upper_eval.state_relax_n = fill(EAGO.IntervalType(1.1, 2.1),(2,2,))
 
     upper_eval.has_ineq = true
     upper_eval.objective_fun = f
     upper_eval.constraints_fun = g
-    upper_eval.obj_relax = MC{2}(1.0, 2.4)
-    upper_eval.constraint_relax = [MC{2}(1.0, 2.4)]
+    upper_eval.obj_relax = EAGO.IntervalType(1.0, 2.4)
+    upper_eval.constraint_relax = [EAGO.IntervalType(1.0, 2.4)]
 
     upper_eval.obj_eval = true
     EAGO_Differential.relax_objective!(upper_eval)
-    @test upper_eval.obj_relax.cv == 1.0
-    @test upper_eval.obj_relax.cc == 2.4
-    @test upper_eval.obj_relax.Intv.lo == 1.0
-    @test upper_eval.obj_relax.Intv.hi == 2.4
+    @test upper_eval.obj_relax.lo == 1.0
+    @test upper_eval.obj_relax.hi == 2.4
     @test upper_eval.obj_eval == true
 
     upper_eval.obj_eval = false
     EAGO_Differential.relax_objective!(upper_eval)
-    @test upper_eval.obj_relax.cv == 1.1
-    @test upper_eval.obj_relax.cc == 2.1
-    @test upper_eval.obj_relax.Intv.lo == 1.1
-    @test upper_eval.obj_relax.Intv.hi == 2.1
+    @test upper_eval.obj_relax.lo == 1.1
+    @test upper_eval.obj_relax.hi == 2.1
     @test upper_eval.obj_eval == true
 
     upper_eval.cnstr_eval = true
     EAGO_Differential.relax_constraints!(upper_eval)
-    @test upper_eval.constraint_relax[1].cv == 1.0
-    @test upper_eval.constraint_relax[1].cc == 2.4
-    @test upper_eval.constraint_relax[1].Intv.lo == 1.0
-    @test upper_eval.constraint_relax[1].Intv.hi == 2.4
+    @test upper_eval.constraint_relax[1].lo == 1.0
+    @test upper_eval.constraint_relax[1].hi == 2.4
     @test upper_eval.cnstr_eval == true
 
     upper_eval.cnstr_eval = false
     EAGO_Differential.relax_constraints!(upper_eval)
-    @test isapprox(upper_eval.constraint_relax[1].cv, 3.3, atol = 1E-6)
-    @test isapprox(upper_eval.constraint_relax[1].cc, 6.3, atol = 1E-6)
-    @test isapprox(upper_eval.constraint_relax[1].Intv.lo, 3.3, atol = 1E-6)
-    @test isapprox(upper_eval.constraint_relax[1].Intv.hi, 6.3, atol = 1E-6)
+    @test isapprox(upper_eval.constraint_relax[1].lo, 3.3, atol = 1E-6)
+    @test isapprox(upper_eval.constraint_relax[1].hi, 6.3, atol = 1E-6)
     @test upper_eval.cnstr_eval == true
 end
 
 @testset "Upper Relaxation Calculation Routines (1D)" begin
+#=
     # soft build, then evaluate
     upper_eval = ImplicitODEUpperEvaluator()
 
@@ -153,6 +140,7 @@ end
 
     y = [-16.0]
     EAGO_Differential.relax_ode_implicit!(upper_eval, y)
+    =#
 end
 
 @testset "Upper Relaxation Calculation Routines (3D)" begin
