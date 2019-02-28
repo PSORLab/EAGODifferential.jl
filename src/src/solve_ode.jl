@@ -1,5 +1,4 @@
 function interval_preprocess_ode!(x::EAGO.Optimizer, y::EAGO.NodeBB)
-
     Eflag = false
     Iflag = false
     eDflag = false
@@ -35,7 +34,6 @@ function interval_preprocess_ode!(x::EAGO.Optimizer, y::EAGO.NodeBB)
             end
         end
     end
-
 end
 
 function create_mid_node(y::NodeBB, nx::Int, np::Int, nt::Int)
