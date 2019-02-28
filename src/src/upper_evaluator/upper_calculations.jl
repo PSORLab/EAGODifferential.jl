@@ -6,7 +6,7 @@ Main calculation kernel used for midpoint upper bounding calculation.
 function relax_ode_implicit!(d::ImplicitODEUpperEvaluator)
     # Generate new parameters for implicit relaxation if necessary
     if ~EAGO.same_box(d.current_node, d.last_node, 0.0)
-        println("ran ode upper kernel")
+
         t = [0.0; 0.0]
         nx = d.nx
         np = d.np
@@ -28,7 +28,9 @@ function relax_ode_implicit!(d::ImplicitODEUpperEvaluator)
 
         if (nx == 1)
 
-            fill!(d.state_relax_1, EAGO.IntervalType(lower_var_bnds[1], upper_var_bnds[1]))
+            d.state_relax_1[:] = EAGO.IntervalType.(lower_var_bnds[1:(nx*(nt-1))],
+                                                    upper_var_bnds[1:(nx*(nt-1))])
+
             t[1] = d.ivp.time[2]
             Eflg, Iflg, eDflg = EAGO.param_intv_contractor!(d.state_fun[1], d.state_jac_fun[1],
                                                        view(d.state_relax_1, 1:1), d.Ntemp, d.N, d.Xi,
@@ -36,6 +38,7 @@ function relax_ode_implicit!(d::ImplicitODEUpperEvaluator)
                                                        d.Y, d.J, d.H, d.P,
                                                        d.inc, d.incLow, d.incHigh,
                                                        nx, kmax, etol, rtol)
+
             if Eflg
                 d.exclusion_flag = Eflg
             end
@@ -64,11 +67,13 @@ function relax_ode_implicit!(d::ImplicitODEUpperEvaluator)
                         append!(x0, d.state_relax_1[i-j])
                     end
                 end
+
                 Eflg, Iflg, eDflg = EAGO.param_intv_contractor!(d.state_fun[1], d.state_jac_fun[1],
-                                                          view(d.state_relax_1, i:i), d.Ntemp, d.N, d.Xi,
-                                                          d.X1, x0, t, d.Y, d.J, d.H, d.P,
-                                                          d.inc, d.incLow, d.incHigh,
-                                                          nx, kmax, etol, rtol)
+                                                                view(d.state_relax_1, i:i), d.Ntemp, d.N, d.Xi,
+                                                                d.X1, x0, t, d.Y, d.J, d.H, d.P,
+                                                                d.inc, d.incLow, d.incHigh,
+                                                                nx, kmax, etol, rtol)
+
                 if Eflg
                     d.exclusion_flag = Eflg
                 end

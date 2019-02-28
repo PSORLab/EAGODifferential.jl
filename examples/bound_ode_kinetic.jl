@@ -14,7 +14,7 @@ pU = [1200.0; 1200.0; 40.0]
 xL = [0.0; 0.0; 0.0; 0.0; 0.0]
 xU = [140.0; 140.0; 140.0; 0.4; 140.0]
 
-f(x,p,t) = x[1]
+f(x,x0,p,t) = x[1]
 
 x0(p) = [0.0; 0.0; 0.0; 0.4; 140]
 
@@ -90,9 +90,9 @@ n = NodeBB(lower_vars, upper_vars, -Inf, Inf, 0, -1, false)
 # build the basic evaluator (w/o inequality constraints)
 upper_eval = ImplicitODEUpperEvaluator()
 EAGO_Differential.build_evaluator!(upper_eval, f, h, np, nx, nt, s, t_start, t_end, method, pL, pU, xL, xU, x0; hj = hj)
-y = (pL + pU)/2.0
+y = [xL; (pL + pU)/2.0]
 EAGO.set_current_node!(upper_eval, n)
-EAGO_Differential.relax_ode_implicit!(upper_eval, y)
+EAGO_Differential.relax_ode_implicit!(upper_eval)
 
 #=
 state_relax = upper_eval.state_relax_n
@@ -110,7 +110,8 @@ pdi_kinetics_bounds = DataFrame(lower_kinetic_ip_1 = lo.(state_relax[1,:]),
 CSV.write("pi_kinetic_bounds_ii200.csv", pdi_kinetics_bounds)
 =#
 
-y = (pL + pU)/2.0
+y = copy(upper_vars)
+y[1001:1003] = (pL + pU)/2.0
 EAGO.set_current_node!(lower_eval, n)
 EAGO_Differential.relax_ode_implicit!(lower_eval, y)
 

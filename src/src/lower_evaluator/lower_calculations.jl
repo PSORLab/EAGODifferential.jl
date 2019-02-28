@@ -25,6 +25,10 @@ function relax_ode_implicit!(d::ImplicitODELowerEvaluator, y)
                                              upper_var_bnds[((j-1)*nx+1):(j*nx)])
         end
 
+        P = EAGO.IntervalType.(lower_var_bnds[shift:end], upper_var_bnds[shift:end])
+        ref_p = (lower_var_bnds[shift:end] + upper_var_bnds[shift:end])/2.0
+        pref_mc = MC{np}.(y[shift:end], d.P, 1:np)
+
         d.P[:] = EAGO.IntervalType.(lower_var_bnds[shift:end], upper_var_bnds[shift:end])
         d.ref_p[:] = (lower_var_bnds[shift:end] + upper_var_bnds[shift:end])/2.0
         d.pref_mc[:] = MC{np}.(y[shift:end], d.P, 1:np)
@@ -63,7 +67,6 @@ function relax_ode_implicit!(d::ImplicitODELowerEvaluator, y)
             end
         else
             t[1] = d.ivp.time[2]
-            #println("GENERATED PARAMETERS @ T = 1")
             gen_expansion_params!(d.state_fun[1], d.state_jac_fun[1], d.pref_mc,
                                   d.IC_relaxations, view(d.state_relax_n, 1:nx, 1:1),
                                   d.xa_mc, d.xA_mc, d.z_mc, d.aff_mc, d.X[1:nx,1],
@@ -85,14 +88,12 @@ function relax_ode_implicit!(d::ImplicitODELowerEvaluator, y)
                         append!(x0, d.state_relax_n[:,i-j])
                     end
                 end
-                #println("GENERATED PARAMETERS @ T = $i")
                 gen_expansion_params!(d.state_fun[s], d.state_jac_fun[s], d.pref_mc,
                                       x0, view(d.state_relax_n, 1:nx, i:i), d.xa_mc, d.xA_mc,
                                       d.z_mc, d.aff_mc, d.X[1:nx,i], d.P, d.opts,
                                       view(d.state_ref_relaxation_n, 1:nx, 1:kmax, i:i),
                                       d.H, d.J, d.Y, true, t, true)
                 xref = view(d.state_ref_relaxation_n, 1:nx, 1:kmax, 1:1)
-                #println("xref: $xref")
             end
         end
     end
@@ -107,8 +108,7 @@ function relax_ode_implicit!(d::ImplicitODELowerEvaluator, y)
     if new_point_flag && (~d.init_relax_run)
         d.obj_eval = false
         d.cnstr_eval = false
-        temp = MC{np}.(y, d.P, 1:np)
-        #println("evaluate at new MC point: $temp")
+        temp = MC{np}.(y[shift:end], d.P, 1:np)
         d.var_relax[:] = MC{np}.(y[shift:end], d.P, 1:np)
         d.IC_relaxations[:] = d.initial_condition_fun(d.var_relax)
         if (nx == 1)

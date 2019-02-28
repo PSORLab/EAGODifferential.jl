@@ -83,7 +83,6 @@ function midpoint_upper_bnd_ode!(x::EAGO.Optimizer, y::NodeBB)
         if (result_status == MOI.FEASIBLE_POINT)
             x.current_upper_info.feasibility = true
             val = MOI.eval_objective(evaluator, x.current_upper_info.solution)
-            println("evaluator.state_relax_1: $(evaluator.state_relax_1)")
             x.current_upper_info.value = val
         else
             x.current_upper_info.feasibility = false

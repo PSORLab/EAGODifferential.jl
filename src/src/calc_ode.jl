@@ -11,16 +11,10 @@ IVPInfo() = IVPInfo(0.0, 0.0, 0, 0.0, Float64[], :bdf, 2)
 
 # Defines kernel operator for BDF integrator (1st degree, implicit euler)
 @inline function bdf_kernel_1!(h!::Function, hout, delT::Float64, xout, x1, p, tout)
-    #println("delT: $delT")
-    #println("xout: $xout")
-    #println("x1: $x1")
-    #println("p: $p")
-    #println("tout: $tout")
     h!(hout, xout, p, tout)
     hout[:] *= -delT
     hout[:] += xout
     hout[:] -= x1
-    #println("hout: $hout")
 end
 
 @inline function bdf_jac_kernel_1!(hj!::Function, Jout, delT::Float64, xout, p, tout)
