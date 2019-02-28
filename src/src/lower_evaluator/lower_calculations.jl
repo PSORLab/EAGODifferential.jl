@@ -5,6 +5,7 @@ function relax_ode_implicit!(d::ImplicitODELowerEvaluator, y)
     np = d.np
     kmax = d.opts.kmax
     nt = d.ivp.time_steps
+    shift = nx*(nt-1)+1
 
     lower_var_bnds = d.current_node.lower_variable_bounds
     upper_var_bnds = d.current_node.upper_variable_bounds
@@ -14,7 +15,6 @@ function relax_ode_implicit!(d::ImplicitODELowerEvaluator, y)
     last_node = d.last_node
     new_box_flag = ~EAGO.same_box(d.current_node, d.last_node, 0.0)
     if new_box_flag
-
         d.last_node = d.current_node
         d.obj_eval = false
         d.cnstr_eval = false
@@ -25,10 +25,9 @@ function relax_ode_implicit!(d::ImplicitODELowerEvaluator, y)
                                              upper_var_bnds[((j-1)*nx+1):(j*nx)])
         end
 
-        shift = nx*(nt-1)+1
         d.P[:] = EAGO.IntervalType.(lower_var_bnds[shift:end], upper_var_bnds[shift:end])
         d.ref_p[:] = (lower_var_bnds[shift:end] + upper_var_bnds[shift:end])/2.0
-        d.pref_mc[:] = MC{np}.(y, d.P, 1:np)
+        d.pref_mc[:] = MC{np}.(y[shift:end], d.P, 1:np)
         d.IC_relaxations[:] = d.initial_condition_fun(d.pref_mc)
 
         s = 1
@@ -110,7 +109,7 @@ function relax_ode_implicit!(d::ImplicitODELowerEvaluator, y)
         d.cnstr_eval = false
         temp = MC{np}.(y, d.P, 1:np)
         #println("evaluate at new MC point: $temp")
-        d.var_relax[:] = MC{np}.(y, d.P, 1:np)
+        d.var_relax[:] = MC{np}.(y[shift:end], d.P, 1:np)
         d.IC_relaxations[:] = d.initial_condition_fun(d.var_relax)
         if (nx == 1)
             t[1] = d.ivp.time[2]

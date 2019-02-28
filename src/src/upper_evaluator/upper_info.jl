@@ -3,9 +3,9 @@ function MOI.eval_objective(d::ImplicitODEUpperEvaluator, y)
     d.eval_objective_timer += @elapsed begin
         val = zero(eltype(y))
         if d.has_nlobj
-            relax_ode_implicit!(d,y)
+            relax_ode_implicit!(d)
             relax_objective!(d)
-            val = d.obj_relax.lo
+            val = d.obj_relax.hi
         else
             error("No nonlinear objective.")
         end
@@ -17,7 +17,7 @@ end
 function MOI.eval_constraint(d::ImplicitODEUpperEvaluator, g, y)
     d.eval_constraint_timer += @elapsed begin
         if d.ng > 0
-            relax_ode_implicit!(d,y)
+            relax_ode_implicit!(d)
             relax_constraints!(d)
             for i in 1:d.ng
                 g[i] = d.cnstr_relax[i].lo

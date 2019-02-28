@@ -1,7 +1,7 @@
 @testset "Build Lower Evaluator, Set Node" begin
     lower_eval = ImplicitODELowerEvaluator{1}()
 
-    f(x,p,t) = x[1]
+    f(x,x0,p,t) = x[1]
     function h(H,x,p,t)
         #println("(p[1]*x[1]): $(p[1]*x[1])")
         H[1] = -p[1]*x[1]
@@ -76,8 +76,8 @@ end
     # soft build, then evaluate
     lower_eval = ImplicitODELowerEvaluator{2}()
 
-    f(x,p,t) = x[1][1]
-    g(x,p,t) = [3.0*x[1][1]]
+    f(x,x0,p,t) = x[1][1]
+    g(x,x0,p,t) = [3.0*x[1][1]]
 
     lower_eval.np = 2
     lower_eval.var_relax = [MC{2}(1.0, 2.4);  MC{2}(1.0, 2.4)]
@@ -126,7 +126,7 @@ end
     # soft build, then evaluate
     lower_eval = ImplicitODELowerEvaluator{1}()
 
-    f(x,p,t) = x[1]
+    f(x,x0,p,t) = x[1]
     function h(H,x,p,t)
         H[1] = p[1]*x[1]*(1-x[1])
     end

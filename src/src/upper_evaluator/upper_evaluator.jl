@@ -92,7 +92,7 @@ mutable struct ImplicitODEUpperEvaluator <: MOI.AbstractNLPEvaluator
         d.obj_relax = zero(EAGO.IntervalType)
         d.constraint_relax = [zero(EAGO.IntervalType)]
         d.P = fill(EAGO.IntervalType(0.0), (1,))
-        d.X = fill(EAGO.IntervalType(0.0), (2,2))
+#        d.X = fill(EAGO.IntervalType(0.0), (2,2))
 
         d.H = [zero(EAGO.IntervalType)]
         d.J = fill(zero(EAGO.IntervalType), (2,2))
@@ -184,7 +184,7 @@ function EAGO.build_evaluator!(d::ImplicitODEUpperEvaluator, f::Function, h::Fun
     if ~(g === nothing)
         d.has_ineq = true
         d.constraints_fun = g
-        ng = length(g([ones(nx) for j in 1:nt], ones(np), d.ivp.time))
+        ng = length(g([1.0 for i=1:nx, j=1:(nt-1)], ones(nx), ones(np), d.ivp.time))
         d.ng = ng
         d.constraint_relax = fill(temp, (ng,))
     end
@@ -215,7 +215,7 @@ function EAGO.build_evaluator!(d::ImplicitODEUpperEvaluator, f::Function, h::Fun
     d.N = fill(IntervalType(0.0), (nx,))
     d.Ntemp = fill(IntervalType(0.0), (nx,))
 
-    d.X = fill(IntervalType(0.0), (nx, nt-1))
+#    d.X = fill(IntervalType(0.0), (nx, nt-1))
     d.X1 = fill(IntervalType(0.0), (nx,))
     d.Xi = fill(IntervalType(0.0), (nx,))
 
@@ -223,30 +223,30 @@ function EAGO.build_evaluator!(d::ImplicitODEUpperEvaluator, f::Function, h::Fun
     d.incLow = fill(false, (nx,))
     d.incHigh = fill(false, (nx,))
 
-    indx = 1
-    for i in 1:(nt-1)
-        for j in 1:nx
-            d.X[j,i] = IntervalType(xL[j], xU[j])
-        end
-        indx += 1
-    end
+#    indx = 1
+#    for i in 1:(nt-1)
+#        for j in 1:nx
+#            d.X[j,i] = IntervalType(xL[j], xU[j])
+#        end
+#        indx += 1
+#    end
 end
 
 function EAGO.set_current_node!(x::ImplicitODEUpperEvaluator,n::NodeBB)
-    x.current_node = n
+    x.current_node = copy(n)
 end
 
 function EAGO.set_last_node!(x::ImplicitODEUpperEvaluator,n::NodeBB)
-    x.last_node = n
+    x.last_node =  copy(n)
 end
 
 # LOOKS GREAT!
 function relax_objective!(d::ImplicitODEUpperEvaluator)
     if ~d.obj_eval
         if d.nx == 1
-            d.obj_relax = d.objective_fun(d.state_relax_1, d.var_relax, d.ivp.time)
+            d.obj_relax = d.objective_fun(d.state_relax_1, d.IC_relaxations, d.var_relax, d.ivp.time)
         else
-            d.obj_relax =  d.objective_fun(d.state_relax_n, d.var_relax, d.ivp.time)
+            d.obj_relax =  d.objective_fun(d.state_relax_n, d.IC_relaxations, d.var_relax, d.ivp.time)
         end
         d.obj_eval = true
     end
@@ -257,14 +257,17 @@ function relax_constraints!(d::ImplicitODEUpperEvaluator)
     if d.has_ineq
         if ~d.cnstr_eval
             if d.nx == 1
-                d.constraint_relax[:] = d.constraints_fun(d.state_relax_1, d.var_relax, d.ivp.time)
+                d.constraint_relax[:] = d.constraints_fun(d.state_relax_1, d.IC_relaxations, d.var_relax, d.ivp.time)
             else
-                d.constraint_relax[:] = d.constraints_fun(d.state_relax_n, d.var_relax, d.ivp.time)
+                d.constraint_relax[:] = d.constraints_fun(d.state_relax_n, d.IC_relaxations, d.var_relax, d.ivp.time)
             end
             d.cnstr_eval = true
         end
     end
 end
+
+num_state_variables(d::ImplicitODEUpperEvaluator) = d.nx*(d.nt-1)
+num_decision_variables(d::ImplicitODEUpperEvaluator) = d.np
 
 include("upper_calculations.jl")
 include("upper_info.jl")

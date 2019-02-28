@@ -86,7 +86,7 @@ append!(lower_vars, pL)
 append!(upper_vars, pU)
 n = NodeBB(lower_vars, upper_vars, -Inf, Inf, 0, -1, false)
 
-#=
+
 # build the basic evaluator (w/o inequality constraints)
 upper_eval = ImplicitODEUpperEvaluator()
 EAGO_Differential.build_evaluator!(upper_eval, f, h, np, nx, nt, s, t_start, t_end, method, pL, pU, xL, xU, x0; hj = hj)
@@ -94,6 +94,7 @@ y = (pL + pU)/2.0
 EAGO.set_current_node!(upper_eval, n)
 EAGO_Differential.relax_ode_implicit!(upper_eval, y)
 
+#=
 state_relax = upper_eval.state_relax_n
 pdi_kinetics_bounds = DataFrame(lower_kinetic_ip_1 = lo.(state_relax[1,:]),
                                 upper_kinetic_ip_1 = hi.(state_relax[1,:]),

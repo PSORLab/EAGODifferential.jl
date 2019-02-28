@@ -8,9 +8,13 @@ function interval_preprocess_ode!(x::EAGO.Optimizer, y::EAGO.NodeBB)
     np = evaluator.np
     nt = evaluator.ivp.time_steps
 
+    evaluator.obj_eval = false
+    evaluator.cnstr_eval = false
+    evaluator.init_relax_run = false
+
     set_current_node!(evaluator, y)
     yval = (y.lower_variable_bounds + y.upper_variable_bounds)/2.0
-    relax_ode_implicit!(evaluator, yval)
+    relax_ode_implicit!(evaluator)
 
     g = zeros(evaluator.ng)
     MOI.eval_constraint(evaluator, g, yval)
@@ -31,6 +35,7 @@ function interval_preprocess_ode!(x::EAGO.Optimizer, y::EAGO.NodeBB)
             end
         end
     end
+
 end
 
 function create_mid_node(y::NodeBB, nx::Int, np::Int, nt::Int)
@@ -42,12 +47,10 @@ function create_mid_node(y::NodeBB, nx::Int, np::Int, nt::Int)
                                     upper_variable_bounds[(nx*(nt-1)+1):(nx*(nt-1)+np)])
     P_mid_interval = EAGO.IntervalType.(mid.(P_interval))
 
-    lower_variable_bounds[(nx*(nt-1)+1):(nx*(nt-1)+np)] = lo.(P_mid_interval[:])
-    upper_variable_bounds[(nx*(nt-1)+1):(nx*(nt-1)+np)] = hi.(P_mid_interval[:])
+    ymid = deepcopy(y)
 
-    ymid = EAGO.NodeBB(lower_variable_bounds, upper_variable_bounds,
-                       y.lower_bound, y.upper_bound, y.depth, y.last_branch,
-                       y.branch_direction)
+    ymid.lower_variable_bounds[(nx*(nt-1)+1):(nx*(nt-1)+np)] = lo.(P_mid_interval[:])
+    ymid.upper_variable_bounds[(nx*(nt-1)+1):(nx*(nt-1)+np)] = hi.(P_mid_interval[:])
 
     return ymid
 end
@@ -59,6 +62,9 @@ function midpoint_upper_bnd_ode!(x::EAGO.Optimizer, y::NodeBB)
         nx = evaluator.nx
         np = evaluator.np
         nt = evaluator.ivp.time_steps
+        evaluator.obj_eval = false
+        evaluator.cnstr_eval = false
+        evaluator.init_relax_run = false
 
         node_ymid = create_mid_node(y, nx, np, nt)
         set_current_node!(evaluator, node_ymid)
@@ -77,6 +83,7 @@ function midpoint_upper_bnd_ode!(x::EAGO.Optimizer, y::NodeBB)
         if (result_status == MOI.FEASIBLE_POINT)
             x.current_upper_info.feasibility = true
             val = MOI.eval_objective(evaluator, x.current_upper_info.solution)
+            println("evaluator.state_relax_1: $(evaluator.state_relax_1)")
             x.current_upper_info.value = val
         else
             x.current_upper_info.feasibility = false
@@ -91,13 +98,15 @@ end
 # Modifies functions post initial relaxation to use appropriate nlp evaluator
 function ode_mod!(opt::Optimizer, args)
 
+    # unpack args
     ImpLowerEval = args[1]
     ImpUpperEval = args[2]
     lower_bnds = args[3]
     upper_bnds = args[4]
 
+    # load ode custom functions
     opt.preprocess! = interval_preprocess_ode!
-    opt.relax_function! = implicit_relax_model!
+    opt.relax_function! = EAGO.implicit_relax_model!
     opt.upper_problem! = midpoint_upper_bnd_ode!
 
     # load lower nlp data block
@@ -110,35 +119,38 @@ function ode_mod!(opt::Optimizer, args)
 
     # load upper nlp data block
     upper_eval_block = MOI.NLPBlockData(upper_bnds, ImpUpperEval, true)
-    # if using the midpoint evaluator don't setup upper optimizers &
-    if alt_upper_flag
-        opt.upper_problem! = alt_upper
-    else
-        if MOI.supports(opt.initial_relaxed_optimizer, MOI.NLPBlock())
-            opt.initial_upper_optimizer.nlp_data = deepcopy(upper_eval_block)
-            opt.working_upper_optimizer.nlp_data = deepcopy(upper_eval_block)
-        end
-    end
     opt.nlp_data = upper_eval_block
+
+    # specifies that the decision variables participate in nonlinear expressions
+    # and should be branched on
+    num_state = num_state_variables(ImpLowerEval)
+    num_decis = num_decision_variables(ImpLowerEval)
+    for i in (num_state+1):(num_state+num_decis)
+        opt.nonlinear_variable[i] = true
+    end
 end
 
 """
     solve_ode
 
-Solves the optimization problem `min_{x,p} f(x,p,t)` with respect to_indices
-`dx/dt = h(x,p,t)` on `x in X` and `p in P`.
+Solves the optimization problem `min_{p} f(x,x0,p,t)` with respect to_indices
+`dx/dt = h(x,p,t)` and `g(x,x0,p,t) <= 0` on `x in X` and `p in P` such that x_0 = x_0(p).
+- f(x,x0,p,t) takes the full state vector, the decision vector, and the time vector.
+The time vector may be useful for computation but the problem is solved in p only.
+So for x[3,4] is x_3 at the after 4 time steps (or at time point 5). So x0 is the
+initial condition.
 """
 function solve_ode(f, h, hj, g, x0, xL, xU, pL, pU, t_start, t_end, nt, s, method, opt)
 
     # get dimensions & check for consistency
-    @assert length(pl) == length(pu)
-    @assert length(xl) == length(xu)
-    np = length(pl); nx = length(xl);
+    @assert length(pL) == length(pU)
+    @assert length(xL) == length(xU)
+    np = length(pL); nx = length(xL);
 
-    if (g_func == nothing)
+    if (g == nothing)
         ng = 0
     else
-        ng = length(g_func(ones(nx),ones(np),ones(nt)))
+        ng = length(g(ones(nx,nt-1),ones(nx),ones(np),ones(nt)))
     end
 
     # sets most routines to default (expect bisection)
@@ -151,7 +163,7 @@ function solve_ode(f, h, hj, g, x0, xL, xU, pL, pU, t_start, t_end, nt, s, metho
     for i in 1:(nt-1)
         for j in 1:nx
             MOI.add_constraint(opt, var_EAGO[count], MOI.GreaterThan(xL[j]))
-            MOI.add_constraint(opt, var_EAGO[count], MOI.LessThan(xL[j]))
+            MOI.add_constraint(opt, var_EAGO[count], MOI.LessThan(xU[j]))
             count += 1
         end
     end
@@ -166,11 +178,10 @@ function solve_ode(f, h, hj, g, x0, xL, xU, pL, pU, t_start, t_end, nt, s, metho
     opt.upper_has_node = true
 
     # creates the appropriate lower evaluator
-    lower = ImplicitLowerEvaluator{np}()
-    EAGO_Differential.build_evaluator!(lower, f, h, np, nx, nt, s, method,
-                                              t_start, t_end, pL, pU, xL, xU,
-                                              x0; hj = hj, g = g)
-    upper = ImplicitLowerEvaluator{np}()
+    lower = ImplicitODELowerEvaluator{np}()
+    EAGO_Differential.build_evaluator!(lower, f, h, np, nx, nt, s, t_start, t_end,
+                                       method, pL, pU, xL, xU, x0; hj = hj, g = g)
+    upper = ImplicitODEUpperEvaluator()
     EAGO_Differential.build_evaluator!(upper, f, h, np, nx, nt, s, t_start,
                                               t_end, method, pL, pU, xL, xU,
                                               x0; hj = hj, g = g)

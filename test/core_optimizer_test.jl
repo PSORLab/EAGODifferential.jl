@@ -77,7 +77,7 @@ end
     # soft build, then evaluate
     upper_eval = ImplicitODEUpperEvaluator()
 
-    f(x,p,t) = x[9]
+    f(x,x0,p,t) = x[9]
     function h(H,x,p,t)
         H[1] = p[1]*x[1]*(1-x[1])
     end
@@ -119,7 +119,34 @@ end
     EAGO_Differential.midpoint_upper_bnd_ode!(x, n)
 
     @test x.current_upper_info.feasibility
-    @test isapprox(x.current_upper_info.value, 0.3469091326490117, atol=1E-5)
+    @test isapprox(x.current_upper_info.value, 0.35968613286903667, atol=1E-5)
 end
 
 # TODO: ACTUAL SOLVE ROUTINE
+@testset "Global pODE Optimizer" begin
+
+    opt = EAGO.Optimizer()
+
+    f(x,x0,p,t) = x[1]
+    function h(H,x,p,t)
+        H[1] = p[1]*x[1]*(1-x[1])
+    end
+    function hj(J,x,p,t)
+        J[1,1] = p[1]*(1.0-2.0*x[1])
+    end
+    x0(p) = [0.1]
+
+    np = 1
+    nx = 1
+    nt = 10
+    s = 2
+
+    t_start = 0.0
+    t_end = 1.0
+    method = :BDF
+
+    pL = [1.49]; pU = [1.59]
+    xL = [0.1]; xU = [1.0]
+
+    solve_ode(f, h, hj, nothing, x0, xL, xU, pL, pU, t_start, t_end, nt, s, method, opt)
+end

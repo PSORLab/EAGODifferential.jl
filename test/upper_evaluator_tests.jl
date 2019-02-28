@@ -1,7 +1,7 @@
 @testset "Build Upper Evaluator, Set Node" begin
     upper_eval = ImplicitODEUpperEvaluator()
 
-    f(x,p,t) = x[1]
+    f(x,x0,p,t) = x[1]
     function h(H,x,p,t)
         #println("(p[1]*x[1]): $(p[1]*x[1])")
         H[1] = -p[1]*x[1]
@@ -61,12 +61,12 @@
     @test upper_eval.has_ineq == false
 
     # build evaluator w/ equality constaints
-    g(x,p,t) = [x[1][1] + p[1]; p[1]+t[1]];
+    g(x,x0,p,t) = [x[1,1] + p[1]; p[1] + t[1]];
     build_evaluator!(upper_eval, f, h, np, nx, nt, s, t_start, t_end, method, pL, pU, xL, xU,  x0; g = g, hj = hj)
     @test upper_eval.has_ineq == true
     @test upper_eval.ng == 2
 
-    gval = upper_eval.constraints_fun([[2.1]], [3.4], [1.1])
+    gval = upper_eval.constraints_fun([2.1 2.1; 2.1 2.1], [2.1; 2.1], [3.4], [1.1])
     @test gval[1] == 5.5
     @test gval[2] == 4.5
 end
@@ -75,8 +75,8 @@ end
     # soft build, then evaluate
     upper_eval = ImplicitODEUpperEvaluator()
 
-    f(x,p,t) = x[1][1]
-    g(x,p,t) = [3.0*x[1][1]]
+    f(x,x0,p,t) = x[1,1]
+    g(x,x0,p,t) = [3.0*x[1,1]]
 
     upper_eval.np = 2
     upper_eval.var_relax = [EAGO.IntervalType(1.0, 2.4);  EAGO.IntervalType(1.0, 2.4)]
@@ -149,10 +149,10 @@ end
 
     y = [1.5]
     EAGO.set_current_node!(upper, n)
-    EAGO_Differential.relax_ode_implicit!(upper, y)
+    EAGO_Differential.relax_ode_implicit!(upper)
 
     y1 = [1.55]
-    EAGO_Differential.relax_ode_implicit!(upper, y1)
+    EAGO_Differential.relax_ode_implicit!(upper)
 
     @test isapprox(upper.state_relax_1[1].lo, 0.11725, atol=1E-5)
     @test isapprox(upper.state_relax_1[3].lo, 0.159266, atol=1E-5)

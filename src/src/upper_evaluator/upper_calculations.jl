@@ -3,32 +3,35 @@
 
 Main calculation kernel used for midpoint upper bounding calculation.
 """
-function relax_ode_implicit!(d::ImplicitODEUpperEvaluator, y)
+function relax_ode_implicit!(d::ImplicitODEUpperEvaluator)
     # Generate new parameters for implicit relaxation if necessary
     if ~EAGO.same_box(d.current_node, d.last_node, 0.0)
-
+        println("ran ode upper kernel")
         t = [0.0; 0.0]
         nx = d.nx
         np = d.np
+        nt = d.ivp.time_steps
+
         kmax = d.kmax
         etol = d.etol
         rtol = d.rtol
-        nt = d.ivp.time_steps
 
         d.last_node = d.current_node
         d.obj_eval = false
         d.cnstr_eval = false
-        d.IC_relaxations[:] = d.initial_condition_fun(d.P)
 
-        lower_var_bnds = d.current_node.lower_variable_bounds
-        upper_var_bnds = d.current_node.upper_variable_bounds
+        lower_var_bnds::Vector{Float64} = d.current_node.lower_variable_bounds
+        upper_var_bnds::Vector{Float64} = d.current_node.upper_variable_bounds
+        d.P[:] = EAGO.IntervalType.(lower_var_bnds[(nx*(nt-1)+1):(nx*(nt-1)+np)],
+                                    upper_var_bnds[(nx*(nt-1)+1):(nx*(nt-1)+np)])
+        d.IC_relaxations[:] = d.initial_condition_fun(d.P)
 
         if (nx == 1)
 
             fill!(d.state_relax_1, EAGO.IntervalType(lower_var_bnds[1], upper_var_bnds[1]))
             t[1] = d.ivp.time[2]
             Eflg, Iflg, eDflg = EAGO.param_intv_contractor!(d.state_fun[1], d.state_jac_fun[1],
-                                                       view(d.state_relax_1, 1:1), d.N, d.Xi,
+                                                       view(d.state_relax_1, 1:1), d.Ntemp, d.N, d.Xi,
                                                        d.X1, d.IC_relaxations, t,
                                                        d.Y, d.J, d.H, d.P,
                                                        d.inc, d.incLow, d.incHigh,
@@ -62,7 +65,7 @@ function relax_ode_implicit!(d::ImplicitODEUpperEvaluator, y)
                     end
                 end
                 Eflg, Iflg, eDflg = EAGO.param_intv_contractor!(d.state_fun[1], d.state_jac_fun[1],
-                                                          view(d.state_relax_1, i:i), d.N, d.Xi,
+                                                          view(d.state_relax_1, i:i), d.Ntemp, d.N, d.Xi,
                                                           d.X1, x0, t, d.Y, d.J, d.H, d.P,
                                                           d.inc, d.incLow, d.incHigh,
                                                           nx, kmax, etol, rtol)
@@ -79,7 +82,7 @@ function relax_ode_implicit!(d::ImplicitODEUpperEvaluator, y)
         else
             for i in 1:(nt-1)
                 d.state_relax_n[:,i] .= EAGO.IntervalType.(lower_var_bnds[(nx*(i-1)+1):nx*i],
-                                                      upper_var_bnds[(nx*(i-1)+1):nx*i])
+                                                           upper_var_bnds[(nx*(i-1)+1):nx*i])
             end
             t[1] = d.ivp.time[2]
             Eflg, Iflg, eDflg = EAGO.param_intv_contractor!(d.state_fun[1], d.state_jac_fun[1],
@@ -137,8 +140,8 @@ function MOI.eval_objective(d::ImplicitODEUpperEvaluator, y)
     d.eval_objective_timer += @elapsed begin
         val = 0.0
         if (d.has_nlobj)
-            relax_ode_implicit!(d,y)
-            val = d.value_storage[1].hi
+            relax_ode_implicit!(d)
+            val = d.objective_fun(d.state_relax_1, d.IC_relaxations, d.P, d.ivp.time)
         else
             error("No nonlinear objective.")
         end
@@ -149,8 +152,8 @@ end
 function MOI.eval_constraint(d::ImplicitODEUpperEvaluator, g, y)
     d.eval_constraint_timer += @elapsed begin
         if (d.ng) > 0
-            relax_ode_implicit!(d,y)
-            g[:] = lo.(d.value_storage[2:end])
+            relax_ode_implicit!(d)
+            g[:] = d.constraints_fun(d.state_relax_1, d.IC_relaxations, d.P, d.ivp.time)
         end
     end
     return

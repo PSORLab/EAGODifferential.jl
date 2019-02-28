@@ -52,6 +52,8 @@ mutable struct ImplicitODELowerEvaluator{N} <: MOI.AbstractNLPEvaluator
 
     opts::mc_opts
 
+    objective_ubd::Float64
+
     # timer
     eval_objective_timer::Float64
     eval_constraint_timer::Float64
@@ -119,6 +121,8 @@ mutable struct ImplicitODELowerEvaluator{N} <: MOI.AbstractNLPEvaluator
         d.last_node = NodeBB()
 
         d.opts = mc_opts()
+
+        d.objective_ubd = Inf
 
         d.debug = NaN
 
@@ -244,9 +248,9 @@ end
 function relax_objective!(d::ImplicitODELowerEvaluator)
     if ~d.obj_eval
         if d.nx == 1
-            d.obj_relax = d.objective_fun(d.state_relax_1, d.var_relax, d.ivp.time)
+            d.obj_relax = d.objective_fun(d.state_relax_1, d.IC_relaxations, d.var_relax, d.ivp.time)
         else
-            d.obj_relax =  d.objective_fun(d.state_relax_n, d.var_relax, d.ivp.time)
+            d.obj_relax =  d.objective_fun(d.state_relax_n, d.IC_relaxations, d.var_relax, d.ivp.time)
         end
         d.obj_eval = true
     end
@@ -257,14 +261,17 @@ function relax_constraints!(d::ImplicitODELowerEvaluator)
     if d.has_ineq
         if ~d.cnstr_eval
             if d.nx == 1
-                d.constraint_relax[:] = d.constraints_fun(d.state_relax_1, d.var_relax, d.ivp.time)
+                d.constraint_relax[:] = d.constraints_fun(d.state_relax_1, d.IC_relaxations, d.var_relax, d.ivp.time)
             else
-                d.constraint_relax[:] = d.constraints_fun(d.state_relax_n, d.var_relax, d.ivp.time)
+                d.constraint_relax[:] = d.constraints_fun(d.state_relax_n, d.IC_relaxations, d.var_relax, d.ivp.time)
             end
             d.cnstr_eval = true
         end
     end
 end
+
+num_state_variables(d::ImplicitODELowerEvaluator) = d.nx*(d.ivp.time_steps-1)
+num_decision_variables(d::ImplicitODELowerEvaluator) = d.np
 
 include("lower_calculations.jl")
 include("lower_info.jl")
