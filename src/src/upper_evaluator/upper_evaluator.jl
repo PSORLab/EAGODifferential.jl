@@ -48,6 +48,7 @@ mutable struct ImplicitODEUpperEvaluator <: MOI.AbstractNLPEvaluator
     incHigh::Vector{Bool}
 
     N::Vector{EAGO.IntervalType}
+    Ntemp::Vector{EAGO.IntervalType}
     Xi::Vector{EAGO.IntervalType}
     X1::Vector{EAGO.IntervalType}
 
@@ -109,10 +110,11 @@ mutable struct ImplicitODEUpperEvaluator <: MOI.AbstractNLPEvaluator
         d.incHigh = fill(false, (1,))
 
         d.N = fill(EAGO.IntervalType(0.0), (1,))
+        d.Ntemp = fill(EAGO.IntervalType(0.0), (1,))
         d.X1 = fill(EAGO.IntervalType(0.0), (1,))
         d.Xi = fill(EAGO.IntervalType(0.0), (1,))
 
-        d.kmax = 10
+        d.kmax = 50
         d.etol = 1E-12
         d.rtol = 1E-12
         d.exclusion_flag = false
@@ -210,8 +212,10 @@ function EAGO.build_evaluator!(d::ImplicitODEUpperEvaluator, f::Function, h::Fun
         d.P[i] = IntervalType(pL[i], pU[i])
     end
 
-    d.X = fill(IntervalType(0.0), (nx, nt-1))
     d.N = fill(IntervalType(0.0), (nx,))
+    d.Ntemp = fill(IntervalType(0.0), (nx,))
+
+    d.X = fill(IntervalType(0.0), (nx, nt-1))
     d.X1 = fill(IntervalType(0.0), (nx,))
     d.Xi = fill(IntervalType(0.0), (nx,))
 

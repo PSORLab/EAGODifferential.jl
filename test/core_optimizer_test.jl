@@ -69,7 +69,7 @@ end
     @test isapprox(n.lower_variable_bounds[10], 1.49, atol = 1E-4)
     @test isapprox(n.upper_variable_bounds[10], 1.59, atol = 1E-4)
 
-    println("x.current_preprocess_info.feasibility: $(x.current_preprocess_info.feasibility)")
+    @test x.current_preprocess_info.feasibility
 end
 
 @testset "Interval MidPoint Upper Bound" begin

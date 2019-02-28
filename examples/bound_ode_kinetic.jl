@@ -1,12 +1,12 @@
-using EAGO_Differential, EAGO, DataFrames
+using EAGO_Differential, EAGO, DataFrames, CSV
 
-T = 273
+T = 273.0
 K2 = 46.0*exp(6500.0/T - 18.0)
 K3 = 2.0*K2
 k_1 = 53.0
 k_1s = k_1*10^(-6)
-k_5 = 1.2*10^(-3)
-cO2 = 2.0*10^(-3)
+k_5 = 0.0012
+cO2 = 0.002
 
 pL = [10.0; 10.0; 0.001]
 pU = [1200.0; 1200.0; 40.0]
@@ -27,6 +27,7 @@ function h(out,x,p,t)
     out[3] = p[1]*x[1]*cO2 - (p[1]/K2)*x[3]
     out[4] = -k_1s*x[4]*x[5]
     out[5] = -k_1*x[4]*x[5]
+
 end
 
 function hj(out,x,p,t)
@@ -54,7 +55,7 @@ end
 
 np = 3
 nx = 5
-nt = 5
+nt = 201
 s = 1
 
 t_start = 0.0
@@ -85,9 +86,33 @@ append!(lower_vars, pL)
 append!(upper_vars, pU)
 n = NodeBB(lower_vars, upper_vars, -Inf, Inf, 0, -1, false)
 
+#=
+# build the basic evaluator (w/o inequality constraints)
+upper_eval = ImplicitODEUpperEvaluator()
+EAGO_Differential.build_evaluator!(upper_eval, f, h, np, nx, nt, s, t_start, t_end, method, pL, pU, xL, xU, x0; hj = hj)
+y = (pL + pU)/2.0
+EAGO.set_current_node!(upper_eval, n)
+EAGO_Differential.relax_ode_implicit!(upper_eval, y)
+
+state_relax = upper_eval.state_relax_n
+pdi_kinetics_bounds = DataFrame(lower_kinetic_ip_1 = lo.(state_relax[1,:]),
+                                upper_kinetic_ip_1 = hi.(state_relax[1,:]),
+                                lower_kinetic_ip_2 = lo.(state_relax[2,:]),
+                                upper_kinetic_ip_2 = hi.(state_relax[2,:]),
+                                lower_kinetic_ip_3 = lo.(state_relax[3,:]),
+                                upper_kinetic_ip_3 = hi.(state_relax[3,:]),
+                                lower_kinetic_ip_4 = lo.(state_relax[4,:]),
+                                upper_kinetic_ip_4 = hi.(state_relax[4,:]),
+                                lower_kinetic_ip_5 = lo.(state_relax[5,:]),
+                                upper_kinetic_ip_5 = hi.(state_relax[5,:]))
+
+CSV.write("pi_kinetic_bounds_ii200.csv", pdi_kinetics_bounds)
+=#
+
 y = (pL + pU)/2.0
 EAGO.set_current_node!(lower_eval, n)
 EAGO_Differential.relax_ode_implicit!(lower_eval, y)
 
 y1 = (0.25*pL + 0.75*pU)/2.0
+
 #EAGO_Differential.relax_ode_implicit!(lower_eval, y1)

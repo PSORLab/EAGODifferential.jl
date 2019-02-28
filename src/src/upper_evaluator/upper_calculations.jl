@@ -83,10 +83,10 @@ function relax_ode_implicit!(d::ImplicitODEUpperEvaluator, y)
             end
             t[1] = d.ivp.time[2]
             Eflg, Iflg, eDflg = EAGO.param_intv_contractor!(d.state_fun[1], d.state_jac_fun[1],
-                                                       view(d.state_relax_n, 1:nx, 1:1), d.N, d.Xi,
-                                                       d.X1, d.IC_relaxations, t, d.Y, d.J, d.H, d.P,
-                                                       d.inc, d.incLow, d.incHigh,
-                                                       nx, kmax, etol, rtol)
+                                                            view(d.state_relax_n, 1:nx, 1:1), d.Ntemp,
+                                                            d.N, d.Xi, d.X1, d.IC_relaxations, t, d.Y,
+                                                            d.J, d.H, d.P, d.inc, d.incLow, d.incHigh,
+                                                            nx, kmax, etol, rtol)
             if Eflg
                 d.exclusion_flag = Eflg
             end
@@ -113,9 +113,9 @@ function relax_ode_implicit!(d::ImplicitODEUpperEvaluator, y)
                         append!(x0, d.state_relax_n[:, i-j])
                     end
                 end
-                Eflg, Iflg, eDflg = EAGO.param_intv_contractor!(d.state_fun[1], d.state_jac_fun[1],
-                                                           view(d.state_relax_n, 1:nx, i:i), d.N, d.Xi,
-                                                           d.X1, x0, t, d.Y, d.J, d.H, d.P,
+                Eflg, Iflg, eDflg = EAGO.param_intv_contractor!(d.state_fun[s], d.state_jac_fun[s],
+                                                           view(d.state_relax_n, 1:nx, i:i), d.Ntemp,
+                                                           d.N, d.Xi, d.X1, x0, t, d.Y, d.J, d.H, d.P,
                                                            d.inc, d.incLow, d.incHigh,
                                                            nx, kmax, etol, rtol)
                 if Eflg

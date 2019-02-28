@@ -113,38 +113,61 @@ end
     @test upper_eval.cnstr_eval == true
 end
 
-@testset "Upper Relaxation Calculation Routines (1D)" begin
-#=
+@testset "Upper Relaxation Calculation Routines (1D - Point)" begin
     # soft build, then evaluate
-    upper_eval = ImplicitODEUpperEvaluator()
+    upper = ImplicitODEUpperEvaluator()
 
-    f(x,p,t) = x[1][1]
-    h(H,x,p,t) = [-p[1]*x[1][1]]
-    hj(J,x,p,t) = [-p[1]]
+    f(x,p,t) = x[1]
+    function h(H,x,p,t)
+        H[1] = p[1]*x[1]*(1-x[1])
+    end
+    function hj(J,x,p,t)
+        J[1,1] = p[1]*(1.0-2.0*x[1])
+    end
+    x0(p) = [0.1]
 
     np = 1
     nx = 1
-    nt = 100
+    nt = 10
     s = 2
 
     t_start = 0.0
     t_end = 1.0
-    x0 = [1.0]
     method = :BDF
 
-    pL = [-20.0]; pU = [-10.0]
-    xL = [0.00]; xU = [1.00]
+    pL = [1.5]; pU = [1.5]
+    xL = [0.1]; xU = [1.0]
 
     # build the basic evaluator (w/o inequality constraints)
-    EAGO_Differential.build_evaluator!(upper_eval, f, h, np, nx, nt, s, t_start, t_end, x0, method, pL, pU, xL, xU; hj = hj)
+    EAGO_Differential.build_evaluator!(upper, f, h, np, nx, nt, s, t_start, t_end, method, pL, pU, xL, xU, x0; hj = hj)
 
-    y = [-16.0]
-    EAGO_Differential.relax_ode_implicit!(upper_eval, y)
-    =#
+    lower_vars = fill(xL[1], (nt-1,))
+    upper_vars = fill(xU[1], (nt-1,))
+    append!(lower_vars, pL)
+    append!(upper_vars, pU)
+    n = NodeBB(lower_vars, upper_vars, -Inf, Inf, 0, -1, false)
+
+    y = [1.5]
+    EAGO.set_current_node!(upper, n)
+    EAGO_Differential.relax_ode_implicit!(upper, y)
+
+    y1 = [1.55]
+    EAGO_Differential.relax_ode_implicit!(upper, y1)
+
+    @test isapprox(upper.state_relax_1[1].lo, 0.11725, atol=1E-5)
+    @test isapprox(upper.state_relax_1[3].lo, 0.159266, atol=1E-5)
+    @test isapprox(upper.state_relax_1[6].lo, 0.242828, atol=1E-5)
+    @test isapprox(upper.state_relax_1[9].lo, 0.349821, atol=1E-5)
+    @test isapprox(upper.state_relax_1[1].hi, 0.117251, atol=1E-5)
+    @test isapprox(upper.state_relax_1[3].hi, 0.159267, atol=1E-5)
+    @test isapprox(upper.state_relax_1[6].hi, 0.242829, atol=1E-5)
+    @test isapprox(upper.state_relax_1[9].hi, 0.349822, atol=1E-5)
 end
 
+#=
 @testset "Upper Relaxation Calculation Routines (3D)" begin
 end
+=#
 
 @testset "Upper Evaluator MOI Wrapper" begin
 

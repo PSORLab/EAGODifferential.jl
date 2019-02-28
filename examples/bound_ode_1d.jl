@@ -39,11 +39,11 @@ EAGO.set_current_node!(lower_eval, n)
 EAGO_Differential.relax_ode_implicit!(lower_eval, y)
 
 println("EVALUATE POINT 2")
-y1 = [1.5]
+y1 = [1.55]
 EAGO_Differential.relax_ode_implicit!(lower_eval, y1)
 
 
-
+#=
 upper_eval = ImplicitODEUpperEvaluator()
 EAGO_Differential.build_evaluator!(upper_eval, f, h, np, nx, nt, s, t_start, t_end, method, pL, pU, xL, xU, x0; hj = hj)
 EAGO.set_current_node!(upper_eval, n)
@@ -51,6 +51,7 @@ EAGO_Differential.relax_ode_implicit!(upper_eval, y)
 
 x = EAGO.Optimizer()
 EAGO_Differential.interval_preprocess_ode(x, y)
+=#
 
 #=
 opt = EAGO.Optimizer()

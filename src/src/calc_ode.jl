@@ -65,7 +65,7 @@ end
 
 # Defines kernel operator for AM integrator (2nd degree, Trapezoidal)
 @inline function am_kernel_2!(h!::Function, hout, delT::Float64, xout, x1, p, tout, t1)
-    htemp = copy(xout)
+    htemp = copy(hout)
     h!(hout, xout, p, tout)
     h!(htemp, x1, p, t1)
     hout[:] += htemp

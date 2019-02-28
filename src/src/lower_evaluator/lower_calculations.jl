@@ -15,7 +15,6 @@ function relax_ode_implicit!(d::ImplicitODELowerEvaluator, y)
     new_box_flag = ~EAGO.same_box(d.current_node, d.last_node, 0.0)
     if new_box_flag
 
-        println("GENERATED PARAMETERS")
         d.last_node = d.current_node
         d.obj_eval = false
         d.cnstr_eval = false
@@ -65,38 +64,16 @@ function relax_ode_implicit!(d::ImplicitODELowerEvaluator, y)
             end
         else
             t[1] = d.ivp.time[2]
-            println("relax time t[1] = $(t[1])")
-
-            println("initial condition relaxations")
-            for j in 1:nx
-                print_out = d.IC_relaxations[j]
-                grad_string = "grad ic[$j](cv, cc)[1,2,3] =  ($(round(print_out.cv_grad[1]; digits=3)), $(round(print_out.cc_grad[1]; digits=3))), ($(round(print_out.cv_grad[2]; digits=3)), $(round(print_out.cc_grad[2]; digits=3))), ($(round(print_out.cv_grad[3]; digits=3)), $(round(print_out.cc_grad[3]; digits=3))) "
-                println("ic[$j](cv, cc, Intv) =  ($(print_out.cv),$(print_out.cc),[$(round(print_out.Intv.lo; digits=3)),$(round(print_out.Intv.hi; digits=3))])                     "*grad_string)
-            end
-
+            #println("GENERATED PARAMETERS @ T = 1")
             gen_expansion_params!(d.state_fun[1], d.state_jac_fun[1], d.pref_mc,
                                   d.IC_relaxations, view(d.state_relax_n, 1:nx, 1:1),
                                   d.xa_mc, d.xA_mc, d.z_mc, d.aff_mc, d.X[1:nx,1],
                                   d.P, d.opts, view(d.state_ref_relaxation_n, 1:nx, 1:kmax, 1:1),
                                   d.H, d.J, d.Y, true, t, true)
-            xref = view(d.state_ref_relaxation_n, 1:nx, 1:kmax, 1:1)
-            for i in 1:kmax
-                println("parameter #$i")
-                for j in 1:nx
-                    print_out = xref[j,i]
-                    println("x[$j](cv, cc, Intv) =  ($(print_out.cv),$(print_out.cc),[$(round(print_out.Intv.lo; digits=3)),$(round(print_out.Intv.hi; digits=3))])")
-                end
-                for j in 1:nx
-                    print_out = xref[j,i]
-                    println("x[$j](cv, cc)[1,2,3] =  ($(round(print_out.cv_grad[1]; digits=3)), $(round(print_out.cc_grad[1]; digits=3))), ($(round(print_out.cv_grad[2]; digits=3)), $(round(print_out.cc_grad[2]; digits=3))), ($(round(print_out.cv_grad[3]; digits=3)), $(round(print_out.cc_grad[3]; digits=3))) ")
-                end
-            end
-
             x0 = MC{np}[]
             for i in 2:(nt-1)
                 t[1] = d.ivp.time[i+1]
                 t[2] = d.ivp.time[i]
-                println("relax time t[$i] = $(t)")
                 s = min(i, d.ivp.method_order)
                 empty!(x0)
                 if (s == i)
@@ -109,6 +86,7 @@ function relax_ode_implicit!(d::ImplicitODELowerEvaluator, y)
                         append!(x0, d.state_relax_n[:,i-j])
                     end
                 end
+                #println("GENERATED PARAMETERS @ T = $i")
                 gen_expansion_params!(d.state_fun[s], d.state_jac_fun[s], d.pref_mc,
                                       x0, view(d.state_relax_n, 1:nx, i:i), d.xa_mc, d.xA_mc,
                                       d.z_mc, d.aff_mc, d.X[1:nx,i], d.P, d.opts,
@@ -134,10 +112,8 @@ function relax_ode_implicit!(d::ImplicitODELowerEvaluator, y)
         #println("evaluate at new MC point: $temp")
         d.var_relax[:] = MC{np}.(y, d.P, 1:np)
         d.IC_relaxations[:] = d.initial_condition_fun(d.var_relax)
-        println("d.var_relax: $(d.var_relax)")
         if (nx == 1)
             t[1] = d.ivp.time[2]
-            println("relax time t[1] == $(t[1])")
             implicit_relax_h!(d.state_fun[1], d.state_jac_fun[1], d.var_relax, d.pref_mc,
                               d.IC_relaxations, view(d.state_relax_1, 1:nx, 1:1),
                               d.xa_mc, d.xA_mc, d.z_mc, d.aff_mc, d.X[1:nx,1],
@@ -169,7 +145,6 @@ function relax_ode_implicit!(d::ImplicitODELowerEvaluator, y)
                                   d.H, d.J, d.Y, true, t, true)
             end
         else
-            println("relax time 1")
             t[1] = d.ivp.time[2]
             implicit_relax_h!(d.state_fun[1], d.state_jac_fun[1], d.var_relax, d.pref_mc,
                               d.IC_relaxations, view(d.state_relax_n, 1:nx, 1:1),
@@ -179,10 +154,8 @@ function relax_ode_implicit!(d::ImplicitODELowerEvaluator, y)
 
             x0 = MC{np}[]
             for i in 2:(nt-1)
-                println("relax time $i")
                 t[1] = d.ivp.time[i+1]
                 t[2] = d.ivp.time[i]
-                println("time 2 assigned: $(t[1]), time 1 assigned: $(t[2])")
                 s = min(i, d.ivp.method_order)
                 empty!(x0)
                 if (s == i)
@@ -195,7 +168,6 @@ function relax_ode_implicit!(d::ImplicitODELowerEvaluator, y)
                         append!(x0, d.state_relax_n[:, i-j])
                     end
                 end
-                println("x0: $x0")
                 implicit_relax_h!(d.state_fun[s], d.state_jac_fun[s], d.var_relax, d.pref_mc,
                                   x0, view(d.state_relax_n, 1:nx, i:i),
                                   d.xa_mc, d.xA_mc, d.z_mc, d.aff_mc, d.X[1:nx,i],

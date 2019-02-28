@@ -126,34 +126,68 @@ end
     # soft build, then evaluate
     lower_eval = ImplicitODELowerEvaluator{1}()
 
-    f(x,p,t) = x[1][1]
-    h(H,x,p,t) = [-p[1]*x[1][1]]
-    hj(J,x,p,t) = [-p[1]]
+    f(x,p,t) = x[1]
+    function h(H,x,p,t)
+        H[1] = p[1]*x[1]*(1-x[1])
+    end
+    function hj(J,x,p,t)
+        J[1,1] = p[1]*(1.0-2.0*x[1])
+    end
+    x0(p) = [0.1]
 
     np = 1
     nx = 1
-    nt = 100
+    nt = 10
     s = 2
 
     t_start = 0.0
     t_end = 1.0
-    x0(p) = [1.0]
     method = :BDF
 
-    pL = [-20.0]; pU = [-10.0]
-    xL = [0.00]; xU = [1.00]
+    pL = [1.49]; pU = [1.59]
+    xL = [0.1]; xU = [1.0]
 
     # build the basic evaluator (w/o inequality constraints)
     EAGO_Differential.build_evaluator!(lower_eval, f, h, np, nx, nt, s, t_start, t_end, method, pL, pU, xL, xU, x0; hj = hj)
 
-    y = [-16.0]
-    EAGO_Differential.relax_ode_implicit!(lower_eval, y)
-    # TODO: Add additional checks and checks for each method order...
+    lower_vars = fill(xL[1], (nt-1,))
+    upper_vars = fill(xU[1], (nt-1,))
+    append!(lower_vars, pL)
+    append!(upper_vars, pU)
+    n = NodeBB(lower_vars, upper_vars, -Inf, Inf, 0, -1, false)
 
-    @test lower_eval.IC_relaxations[1].cc == 1.0
-    @test lower_eval.IC_relaxations[1].cv == 1.0
-    @test lower_eval.IC_relaxations[1].Intv.lo == 1.0
-    @test lower_eval.IC_relaxations[1].Intv.hi == 1.0
+    y = [1.5]
+    EAGO.set_current_node!(lower_eval, n)
+    EAGO_Differential.relax_ode_implicit!(lower_eval, y)
+
+    y1 = [1.55]
+    EAGO_Differential.relax_ode_implicit!(lower_eval, y1)
+
+    @test isapprox(lower_eval.state_relax_1[1].cc, 0.11792780395702573, atol = 1E-5)
+    @test isapprox(lower_eval.state_relax_1[1].cv, 0.11789501387926041, atol = 1E-5)
+    @test isapprox(lower_eval.state_relax_1[1].cc_grad[1], 0.0137907, atol = 1E-5)
+    @test isapprox(lower_eval.state_relax_1[1].cv_grad[1], 0.0139398, atol = 1E-5)
+    @test isapprox(lower_eval.state_relax_1[1].Intv.lo, 0.11356, atol = 1E-5)
+    @test isapprox(lower_eval.state_relax_1[1].Intv.hi, 0.122023, atol = 1E-5)
+
+    @test isapprox(lower_eval.state_relax_1[5].cc, 0.2135185403914311, atol = 1E-5)
+    @test isapprox(lower_eval.state_relax_1[5].cv, 0.20884335659681197, atol = 1E-5)
+    @test isapprox(lower_eval.state_relax_1[5].cc_grad[1], 0.0983521, atol = 1E-5)
+    @test isapprox(lower_eval.state_relax_1[5].cv_grad[1], 0.122427, atol = 1E-5)
+    @test lower_eval.state_relax_1[5].Intv.lo == 0.1
+    @test isapprox(lower_eval.state_relax_1[5].Intv.hi, 0.354377, atol = 1E-5)
+
+    @test isapprox(lower_eval.state_relax_1[9].cc, 0.48031192400161316, atol = 1E-5)
+    @test isapprox(lower_eval.state_relax_1[9].cv, 0.22770307046527294, atol = 1E-5)
+    @test isapprox(lower_eval.state_relax_1[9].cc_grad[1], 0.231284, atol = 1E-5)
+    @test isapprox(lower_eval.state_relax_1[9].cv_grad[1], 0.324614, atol = 1E-5)
+    @test lower_eval.state_relax_1[9].Intv.lo == 0.1
+    @test lower_eval.state_relax_1[9].Intv.hi == 1.0
+
+    @test lower_eval.IC_relaxations[1].cc == 0.1
+    @test lower_eval.IC_relaxations[1].cv == 0.1
+    @test lower_eval.IC_relaxations[1].Intv.lo == 0.1
+    @test lower_eval.IC_relaxations[1].Intv.hi == 0.1
 end
 
 #=
@@ -161,9 +195,11 @@ end
     EAGO_Differential.relax_ode_implicit!(lower_eval, y)
 end
 =#
+
 #=
 @testset "Lower Evaluator MOI Wrapper" begin
 
+    println("--- START LOWER EVALUATOR TESTING ---")
     lower_eval = ImplicitODELowerEvaluator{2}()
 
     f_3(x,p,t) = 3.0*x[1]
@@ -182,7 +218,7 @@ end
 
     np = 2
     nx = 2
-    nt = 2
+    nt = 4
     s = 2
     t_start = 0.0
     t_end = 1.0
@@ -197,23 +233,35 @@ end
     build_evaluator!(lower_eval, f_3, h_3!, np, nx, nt, s, t_start, t_end,
                      method, pL, pU, xL, xU, x0; g = g_3, hj = hj_3!)
 
+    lower_vars = Float64[]
+    upper_vars = Float64[]
+    for i in 1:(nt-1)
+        append!(lower_vars, xL)
+        append!(upper_vars, xU)
+    end
+    append!(lower_vars, pL)
+    append!(upper_vars, pU)
+
     # update the node info for the evaluator to initial node
-    n1 = EAGO.NodeBB(Float64[-0.12,-0.12,-15.0,-20.0], Float64[-0.04,-0.04,-10.0,-10.0], -3.4, 2.1, 2, 1, true)
+    n1 = EAGO.NodeBB(lower_vars, upper_vars, -3.4, 2.1, 2, 1, true)
     EAGO.set_current_node!(lower_eval, n1)
 
-    y = [-0.08; -0.07; -12.0; -11.0]
-    w = [1.0; 2.0; 3.0; 4.0]
+    y = [-12.0; -14.0]
+    w = [1.0; 2.0]
 
     fval = MOI.eval_objective(lower_eval, y)
-    @test fval == 1
+    println("lower_eval.obj_relax: $(lower_eval.obj_relax)")
+    #@test fval == 1
+
 
     g = zeros[2]
     MOI.eval_constraint(lower_eval, g, y)
+    MOI.println("lower_eval.constraint_relax: $(lower_eval.constraint_relax)")
     #@test g[1] == 0.0 # TODO
     #@test g[2] == 0.0 # TODO
 
-    df = zeros[2]
-    MOI.eval_objective_gradient(lower_eval, df, y)
+    #df = zeros[2]
+    #MOI.eval_objective_gradient(lower_eval, df, y)
     #@test df[1] == 0.0 # TODO
     #@test df[2] == 0.0 # TODO
 
@@ -230,20 +278,20 @@ end
     @test_throws ErrorException MOI.hessian_lagrangian_structure(lower_eval)
     @test_throws ErrorException EAGO_Differential._hessian_lagrangian_structure(lower_eval)
 
-    g = zeros[2,2]
-    MOI.eval_constraint_jacobian(lower_eval, g, y)
-    @test g[1,1] == 0.0
-    @test g[1,2] == 0.0
-    @test g[2,1] == 0.0
-    @test g[2,2] == 0.0
+    #g = zeros[2,2]
+    #MOI.eval_constraint_jacobian(lower_eval, g, y)
+    #@test g[1,1] == 0.0
+    #@test g[1,2] == 0.0
+    #@test g[2,1] == 0.0
+    #@test g[2,2] == 0.0
 
-    out = zeros[2]
-    MOI.eval_constraint_jacobian_product(lower_eval, out, y, w)
+    #out = zeros[2]
+    #MOI.eval_constraint_jacobian_product(lower_eval, out, y, w)
     #@test out[1] == 0.0 TODO
     #@test out[2] == 0.0 TODO
 
-    out = zeros[2]
-    MOI.eval_constraint_jacobian_transpose_product(lower_eval, out, y, w)
+    #out = zeros[2]
+    #MOI.eval_constraint_jacobian_transpose_product(lower_eval, out, y, w)
     #@test out[1] == 0.0 TODO
     #@test out[2] == 0.0 TODO
 
