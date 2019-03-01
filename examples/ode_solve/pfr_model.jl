@@ -50,4 +50,9 @@ t_start = 0.0
 t_end = 1.0
 method = :AM
 
+# calculate aprior lower bounds via ODE solution
+
+# calculate aprior upper bounds via ODE solution
+#
+
 out1, out2 = solve_ode(f, h, hj, nothing, x0, xL, xU, pL, pU, t_start, t_end, nt, s, method, opt)
