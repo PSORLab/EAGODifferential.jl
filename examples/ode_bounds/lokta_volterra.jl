@@ -50,7 +50,7 @@ append!(upper_vars, pU)
 n1 = EAGO.NodeBB(lower_vars, upper_vars, -3.4, 2.1, 2, 1, true)
 EAGO.set_current_node!(lower_eval, n1)
 
-y = [3.0; 1.0]
+y = [xL; 3.0; 1.0]
 fval = MOI.eval_objective(lower_eval, y)
 
 lower_eval1 = ImplicitODELowerEvaluator{2}()
