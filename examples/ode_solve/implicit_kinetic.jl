@@ -2,7 +2,7 @@
 
 using EAGO_Differential, EAGO, DataFrames, CSV
 
-opt = EAGO.Optimizer(absolute_tolerance = 0.01, relative_tolerance = 0.00001,
+opt = EAGO.Optimizer(absolute_tolerance = 1.00, relative_tolerance = 0.2,
                      iteration_limit = Int(1E6),
                      verbosity = 1,
                      output_iterations = 20,
@@ -90,20 +90,20 @@ method = :AM
 run_style = :AM40
 if run_style === :II200
     var_II200, opt_II200 = solve_ode(f200, h, hj, nothing, x0, xL, xU, pL, pU, t_start, t_end, 201, 1, :AM, opt)
-    save_history("ii200", var_II200, opt_II200, "Implicit Kinetic Example, 200 Time-Steps, Implicit Euler")
+    EAGO_Differential.save_history("ii200", var_II200, opt_II200, "Implicit Kinetic Example, 200 Time-Steps, Implicit Euler")
 elseif run_style === :AM200
     var_AM200, opt_AM200 = solve_ode(f200, h, hj, nothing, x0, xL, xU, pL, pU, t_start, t_end, 201, 2, :AM, opt)
-    save_history("am200", var_AM200, opt_AM200, "Implicit Kinetic Example, 200 Time-Steps, Trapezoidal Method")
+    EAGO_Differential.save_history("am200", var_AM200, opt_AM200, "Implicit Kinetic Example, 200 Time-Steps, Trapezoidal Method")
 elseif run_style == :BDF200
     var_BDF200, opt_BDF200 = solve_ode(f200, h, hj, nothing, x0, xL, xU, pL, pU, t_start, t_end, 201, 2, :BDF, opt)
     save_history("bdf200", var_BDF200, opt_BDF200, "Implicit Kinetic Example, 200 Time-Steps, Backwards Difference Formula")
-elseif
+elseif run_style === :II40
     var_II40, opt_II40 = solve_ode(f40, h, hj, nothing, x0, xL, xU, pL, pU, t_start, t_end, 41, 1, :AM, opt)
-    save_history("ii40", var_II40, opt_II40, "Implicit Kinetic Example, 40 Time-Steps, Implicit Euler")
-elseif
+    EAGO_Differential.save_history("ii40", var_II40, opt_II40, "Implicit Kinetic Example, 40 Time-Steps, Implicit Euler")
+elseif run_style === :AM40
     var_AM40, opt_AM40 = solve_ode(f40, h, hj, nothing, x0, xL, xU, pL, pU, t_start, t_end, 41, 2, :AM, opt)
-    save_history("am40", var_AM40, opt_AM40, "Implicit Kinetic Example, 40 Time-Steps, Trapezoidal Method")
-elseif
+    EAGO_Differential.save_history("am40", var_AM40, opt_AM40, "Implicit Kinetic Example, 40 Time-Steps, Trapezoidal Method")
+elseif run_style == :BDF40
     var_BDF40, opt_BDF40 = solve_ode(f40, h, hj, nothing, x0, xL, xU, pL, pU, t_start, t_end, 41, 2, :AM, opt)
-    save_history("bdf40", var_BDF40, opt_BDF40, "Implicit Kinetic Example, 40 Time-Steps, Backwards Difference Formula")
+    EAGO_Differential.save_history("bdf40", var_BDF40, opt_BDF40, "Implicit Kinetic Example, 40 Time-Steps, Backwards Difference Formula")
 end

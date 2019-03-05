@@ -1,3 +1,8 @@
+# Shin Stirred-Tank Example (Singularity Error)
+
+using EAGO_Differential, EAGO, DataFrames, MathOptInterface
+const MOI = MathOptInterface
+
 tau = 20.0
 k2 = 0.4
 
@@ -6,8 +11,8 @@ pU = [1.1; 1.0; 50.0]
 
 # Need to determine upper bounds on xB = X, xD = Y
 #
-X = 1.0
-Y = 1.0
+X = 0.5
+Y = 0.5
 xL = [0.0; 0.0; 0.0; 0.0]
 xU = [0.2; X; 0.5; Y]
 
@@ -44,33 +49,14 @@ end
 x0(p) = [0.0; 0.0; 0.0; 0.0]
 
 time_start = 0.0
-time_end = 10.0
+time_end = 15.0
 nx = 4
 np = 3
-nt1 = 21
+nt = 21
 
-lower_vars = Float64[]
-upper_vars = Float64[]
-for i in 1:(nt1-1)
-    append!(lower_vars, xL)
-    append!(upper_vars, xU)
-end
-append!(lower_vars, pL)
-append!(upper_vars, pU)
-n = NodeBB(lower_vars, upper_vars, -Inf, Inf, 0, -1, false)
-y = [xL]; (pL+pU)/2]
+x0(p) = zeros(4)
+method = :AM
+s = 2
 
-lower_eval1 = ImplicitODELowerEvaluator{np}()
-build_evaluator!(lower_eval1, f, h, np, nx, nt1, 1, t_start, t_end, :AM, pL, pU, xL, xU, x0; g = g, hj = hj)
-EAGO.set_current_node!(lower_eval1, n)
-EAGO_Differential.relax_ode_implicit!(lower_eval1, y)
-
-lower_eval2 = ImplicitODELowerEvaluator{np}()
-build_evaluator!(lower_eval2, f, h, np, nx, nt, 2, t_start, t_end, :AM, pL, pU, xL, xU, x0; g = g, hj = hj)
-EAGO.set_current_node!(lower_eval2, n)
-EAGO_Differential.relax_ode_implicit!(lower_eval2, y)
-
-lower_eval3 = ImplicitODELowerEvaluator{np}()
-build_evaluator!(lower_eval3, f, h, np, nx, nt, 2, t_start, t_end, :BDF, pL, pU, xL, xU, x0; g = g, hj = hj)
-EAGO.set_current_node!(lower_eval3, n)
-EAGO_Differential.relax_ode_implicit!(lower_eval3, y)
+EAGO_Differential.save_bounds("/stirred_tank_bnd", "Stirred-Tank", f, h, np, nx, nt, s,
+                              t_start, t_end, method, pL, pU, xL, xU, x0; hj = hj)

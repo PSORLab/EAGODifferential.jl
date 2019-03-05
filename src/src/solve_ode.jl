@@ -137,7 +137,8 @@ The time vector may be useful for computation but the problem is solved in p onl
 So for x[3,4] is x_3 at the after 4 time steps (or at time point 5). So x0 is the
 initial condition.
 """
-function solve_ode(f, h, hj, g, x0, xL, xU, pL, pU, t_start, t_end, nt, s, method, opt)
+function solve_ode(f, h, hj, g, x0, xL, xU, pL, pU, t_start, t_end, nt, s, method, opt;
+                   state_update = x -> ())
 
     # get dimensions & check for consistency
     @assert length(pL) == length(pU)
@@ -177,7 +178,8 @@ function solve_ode(f, h, hj, g, x0, xL, xU, pL, pU, t_start, t_end, nt, s, metho
     # creates the appropriate lower evaluator
     lower = ImplicitODELowerEvaluator{np}()
     EAGO_Differential.build_evaluator!(lower, f, h, np, nx, nt, s, t_start, t_end,
-                                       method, pL, pU, xL, xU, x0; hj = hj, g = g)
+                                       method, pL, pU, xL, xU, x0; hj = hj, g = g,
+                                       state_update = state_update = state_update)
     upper = ImplicitODEUpperEvaluator()
     EAGO_Differential.build_evaluator!(upper, f, h, np, nx, nt, s, t_start,
                                               t_end, method, pL, pU, xL, xU,

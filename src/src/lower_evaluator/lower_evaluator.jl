@@ -7,6 +7,7 @@ mutable struct ImplicitODELowerEvaluator{N} <: MOI.AbstractNLPEvaluator
     has_nlobj::Bool
     has_ineq::Bool
     objective_fun
+    state_update
     constraints_fun
     initial_condition_fun
 
@@ -68,6 +69,7 @@ mutable struct ImplicitODELowerEvaluator{N} <: MOI.AbstractNLPEvaluator
 
         d.objective_fun = nothing
         d.constraints_fun = nothing
+        d.state_update = nothing
         d.initial_condition_fun = nothing
         d.state_fun =  Function[]
         d.state_jac_fun = Function[]
@@ -141,11 +143,12 @@ encountered in optimal control formulations.
 function EAGO.build_evaluator!(d::ImplicitODELowerEvaluator, f::Function, h::Function, np::Int, nx::Int,
                                nt::Int, s::Int, t_start::Float64, t_end::Float64, method::Symbol,
                                pL::Vector{Float64}, pU::Vector{Float64}, xL::Vector{Float64}, xU::Vector{Float64}, ic::Function;
-                               g = nothing, hj = nothing)
+                               g = nothing, hj = nothing, state_update = x -> ())
 
     # setup objective and constraint functions
     d.has_nlobj = true
     d.objective_fun = f
+    d.state_update = state_update
     d.initial_condition_fun = ic
 
     # sets up initial value problem parameters
@@ -186,7 +189,7 @@ function EAGO.build_evaluator!(d::ImplicitODELowerEvaluator, f::Function, h::Fun
     if ~(g === nothing)
         d.has_ineq = true
         d.constraints_fun = g
-        ng = length(g([ones(nx) for j in 1:nt], ones(np), d.ivp.time))
+        ng = length(g([ones(nx) for j in 1:nt], ones(nx), ones(np), d.ivp.time))
         d.ng = ng
         d.constraint_relax = fill(temp, (ng,))
     end

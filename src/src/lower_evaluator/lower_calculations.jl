@@ -33,6 +33,7 @@ function relax_ode_implicit!(d::ImplicitODELowerEvaluator, y)
         d.ref_p[:] = (lower_var_bnds[shift:end] + upper_var_bnds[shift:end])/2.0
         d.pref_mc[:] = MC{np}.(y[shift:end], d.P, 1:np)
         d.IC_relaxations[:] = d.initial_condition_fun(d.pref_mc)
+        d.state_update(d.IC_relaxations[:])
 
         s = 1
         if (nx == 1)
@@ -72,6 +73,7 @@ function relax_ode_implicit!(d::ImplicitODELowerEvaluator, y)
                                   d.xa_mc, d.xA_mc, d.z_mc, d.aff_mc, d.X[1:nx,1],
                                   d.P, d.opts, view(d.state_ref_relaxation_n, 1:nx, 1:kmax, 1:1),
                                   d.H, d.J, d.Y, true, t, true)
+            d.state_update(view(d.state_relax_n, 1:nx, 1:1))
             x0 = MC{np}[]
             for i in 2:(nt-1)
                 t[1] = d.ivp.time[i+1]
@@ -93,6 +95,7 @@ function relax_ode_implicit!(d::ImplicitODELowerEvaluator, y)
                                       d.z_mc, d.aff_mc, d.X[1:nx,i], d.P, d.opts,
                                       view(d.state_ref_relaxation_n, 1:nx, 1:kmax, i:i),
                                       d.H, d.J, d.Y, true, t, true)
+                d.state_update(view(d.state_relax_n, 1:nx, i:i))
                 xref = view(d.state_ref_relaxation_n, 1:nx, 1:kmax, 1:1)
             end
         end
@@ -150,7 +153,7 @@ function relax_ode_implicit!(d::ImplicitODELowerEvaluator, y)
                               d.xa_mc, d.xA_mc, d.z_mc, d.aff_mc, d.X[1:nx,1],
                               d.P, d.opts, view(d.state_ref_relaxation_n, 1:nx, :, 1:1),
                               d.H, d.J, d.Y, true, t, true)
-
+            d.state_update(view(d.state_relax_n, 1:nx, 1:1))
             x0 = MC{np}[]
             for i in 2:(nt-1)
                 t[1] = d.ivp.time[i+1]
@@ -172,6 +175,7 @@ function relax_ode_implicit!(d::ImplicitODELowerEvaluator, y)
                                   d.xa_mc, d.xA_mc, d.z_mc, d.aff_mc, d.X[1:nx,i],
                                   d.P, d.opts, view(d.state_ref_relaxation_n, 1:nx, :, i:i),
                                   d.H, d.J, d.Y, true, t, true)
+                d.state_update(view(d.state_relax_n, 1:nx, i:i))
             end
         end
     end
