@@ -1,4 +1,4 @@
-module EAGO_Differential
+module EAGODifferential
 
 
     using EAGO, MathOptInterface, LinearAlgebra, DataFrames, CSV
