@@ -138,11 +138,12 @@ So for x[3,4] is x_3 at the after 4 time steps (or at time point 5). So x0 is th
 initial condition.
 """
 function solve_ode(f, h, hj, g, x0, xL, xU, pL, pU, t_start, t_end, nt, s, method, opt;
-                   state_update = x -> ())
+                   state_update = x -> (), user_xtL = [], user_xtU = [])
 
     # get dimensions & check for consistency
     @assert length(pL) == length(pU)
     @assert length(xL) == length(xU)
+    @assert length(user_xtL) == length(user_xtU)
     np = length(pL); nx = length(xL);
 
     if (g == nothing)
@@ -157,12 +158,19 @@ function solve_ode(f, h, hj, g, x0, xL, xU, pL, pU, t_start, t_end, nt, s, metho
 
     # Add variables
     var_EAGO = MOI.add_variables(opt, nx*(nt-1)+np)
-    count = 1
-    for i in 1:(nt-1)
-        for j in 1:nx
-            MOI.add_constraint(opt, var_EAGO[count], MOI.GreaterThan(xL[j]))
-            MOI.add_constraint(opt, var_EAGO[count], MOI.LessThan(xU[j]))
-            count += 1
+    if length(user_xtL) > 0
+        for i in 1:length(user_xtL)
+            MOI.add_constraint(opt, var_EAGO[i], MOI.GreaterThan(user_xtL[i]))
+            MOI.add_constraint(opt, var_EAGO[i], MOI.LessThan(user_xtU[i]))
+        end
+    else
+        count = 1
+        for i in 1:(nt-1)
+            for j in 1:nx
+                MOI.add_constraint(opt, var_EAGO[count], MOI.GreaterThan(xL[j]))
+                MOI.add_constraint(opt, var_EAGO[count], MOI.LessThan(xU[j]))
+                count += 1
+            end
         end
     end
 
@@ -182,8 +190,10 @@ function solve_ode(f, h, hj, g, x0, xL, xU, pL, pU, t_start, t_end, nt, s, metho
                                        state_update = state_update = state_update)
     upper = ImplicitODEUpperEvaluator()
     EAGO_Differential.build_evaluator!(upper, f, h, np, nx, nt, s, t_start,
-                                              t_end, method, pL, pU, xL, xU,
+                                              t_end, method, pL, pU,
                                               x0; hj = hj, g = g)
+
+    # update evaluators for non-constant box size
 
     # Add nlp data blocks ("SHOULD" BE THE LAST THING TO DO)
     bnd_pair = MOI.NLPBoundsPair(-Inf,0.0)

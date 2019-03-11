@@ -1,6 +1,6 @@
 using EAGO_Differential, EAGO, DataFrames, CSV
 
-opt = EAGO.Optimizer(absolute_tolerance = 0.1, relative_tolerance = 0.01,
+opt = EAGO.Optimizer(absolute_tolerance = 0.001, relative_tolerance = 0.001,
                      iteration_limit = Int(1E6),
                      verbosity = 1,
                      output_iterations = 20,
@@ -9,7 +9,7 @@ opt = EAGO.Optimizer(absolute_tolerance = 0.1, relative_tolerance = 0.01,
 pL = [0.9; 0.3]
 pU = [1.0; 0.4]
 
-nodes = 21
+nodes = 11
 tau = 10.0
 dx = 1.0/(nodes-1)
 xL = zeros(nodes)
@@ -39,12 +39,15 @@ function hj(out,x,p,t)
     end
 end
 
-f(x,x0,p,t) = x[1000]
+f(x,x0,p,t) = x[300]
 
 np = 2
 nx = nodes
-nt = 51
+nt = 31
 s = 1
+
+# 10-by-10 solves fine for simple objective (s = 1, AM), (s = 2, AM)
+# 10-by-30 solves for (s=2, AM)
 
 t_start = 0.0
 t_end = 1.0

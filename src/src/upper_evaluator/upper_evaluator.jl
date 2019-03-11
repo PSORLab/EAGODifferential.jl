@@ -114,7 +114,7 @@ mutable struct ImplicitODEUpperEvaluator <: MOI.AbstractNLPEvaluator
         d.X1 = fill(EAGO.IntervalType(0.0), (1,))
         d.Xi = fill(EAGO.IntervalType(0.0), (1,))
 
-        d.kmax = 50
+        d.kmax = 5
         d.etol = 1E-12
         d.rtol = 1E-12
         d.exclusion_flag = false
@@ -140,7 +140,7 @@ encountered in optimal control formulations.
 """
 function EAGO.build_evaluator!(d::ImplicitODEUpperEvaluator, f::Function, h::Function, np::Int, nx::Int,
                                nt::Int, s::Int, t_start::Float64, t_end::Float64, method::Symbol,
-                               pL::Vector{Float64}, pU::Vector{Float64}, xL::Vector{Float64}, xU::Vector{Float64}, ic::Function;
+                               pL::Vector{Float64}, pU::Vector{Float64}, ic::Function;
                                g = nothing, hj = nothing)
 
     # setup objective and constraint functions
@@ -222,14 +222,6 @@ function EAGO.build_evaluator!(d::ImplicitODEUpperEvaluator, f::Function, h::Fun
     d.inc = fill(false, (nx,))
     d.incLow = fill(false, (nx,))
     d.incHigh = fill(false, (nx,))
-
-#    indx = 1
-#    for i in 1:(nt-1)
-#        for j in 1:nx
-#            d.X[j,i] = IntervalType(xL[j], xU[j])
-#        end
-#        indx += 1
-#    end
 end
 
 function EAGO.set_current_node!(x::ImplicitODEUpperEvaluator,n::NodeBB)

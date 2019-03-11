@@ -143,7 +143,7 @@ encountered in optimal control formulations.
 function EAGO.build_evaluator!(d::ImplicitODELowerEvaluator, f::Function, h::Function, np::Int, nx::Int,
                                nt::Int, s::Int, t_start::Float64, t_end::Float64, method::Symbol,
                                pL::Vector{Float64}, pU::Vector{Float64}, xL::Vector{Float64}, xU::Vector{Float64}, ic::Function;
-                               g = nothing, hj = nothing, state_update = x -> ())
+                               g = nothing, hj = nothing, state_update = x -> (), user_xtL = [], user_xtU = [])
 
     # setup objective and constraint functions
     d.has_nlobj = true
@@ -233,6 +233,8 @@ function EAGO.build_evaluator!(d::ImplicitODELowerEvaluator, f::Function, h::Fun
         end
         indx += 1
     end
+    
+    user_xtL = [], user_xtU = []
 
     # allocates the reference points
     d.last_p = zeros(Float64, np); fill!(d.last_p, NaN)
