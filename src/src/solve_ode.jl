@@ -54,9 +54,11 @@ function create_mid_node(y::NodeBB, nx::Int, np::Int, nt::Int)
 end
 
 function midpoint_upper_bnd_ode!(x::EAGO.Optimizer, y::NodeBB)
+    #println("START UPPER EVALUATOR")
     if EAGO.is_integer_feasible(x) #&& mod(x.CurrentIterationCount,x.UpperBoundingInterval) == 1
 
         evaluator = x.nlp_data.evaluator
+        #println("evaluator.ng: $(evaluator.ng)")
         nx = evaluator.nx
         np = evaluator.np
         nt = evaluator.ivp.time_steps
@@ -71,7 +73,10 @@ function midpoint_upper_bnd_ode!(x::EAGO.Optimizer, y::NodeBB)
         if evaluator.ng > 0
             g = zeros(evaluator.ng)
             MOI.eval_constraint(evaluator, g, x.current_upper_info.solution)
+            #println("g: $(g)")
+            g[1] = mid(evaluator.state_relax_n[20,29]) - 0.08
             result_status = any(i-> (i > 0), g) ? MOI.INFEASIBLE_POINT : MOI.FEASIBLE_POINT
+            #println("result_status: $(result_status)")
             if (result_status == MOI.FEASIBLE_POINT)
                 result_status = evaluator.exclusion_flag ? MOI.INFEASIBLE_POINT : MOI.FEASIBLE_POINT
             end
@@ -79,15 +84,98 @@ function midpoint_upper_bnd_ode!(x::EAGO.Optimizer, y::NodeBB)
             result_status = MOI.FEASIBLE_POINT
         end
         if (result_status == MOI.FEASIBLE_POINT)
+            #println("result_status == MOI.FEASIBLE_POINT")
+            #println("started eval objective")
             x.current_upper_info.feasibility = true
+            #println("x.current_upper_info.solution: $(x.current_upper_info.solution)")
             val = MOI.eval_objective(evaluator, x.current_upper_info.solution)
+            #println("evaluator: $(evaluator.state_relax_n[20,:])")
+            #println("val: $(val)")
             x.current_upper_info.value = val
+            x.current_upper_info.value = mid(evaluator.P[1])
         else
+            #println("result_status == MOI.INFEASIBLE_POINT")
             x.current_upper_info.feasibility = false
             x.current_upper_info.value = Inf
         end
     else
         x.current_upper_info.feasibility = false
+        x.current_upper_info.value = Inf
+    end
+end
+
+function concave_upper_bnd_ode!(x::EAGO.Optimizer, y::NodeBB)
+    # Copies initial model into working model (if initial model isn't dummy)
+    # A dummy model is left iff all terms are relaxed
+    if x.use_lower_factory
+        factory = x.lower_factory(;x.lower_optimizer_options...)     # Should accept keyword arguments
+        x.working_relaxed_optimizer = factory
+        MOI.add_variables(x.working_relaxed_optimizer, x.variable_number)
+    else
+        if x.initial_relaxed_optimizer != EAGO.DummyOptimizer()
+            x.working_relaxed_optimizer = deepcopy(x.initial_relaxed_optimizer)
+        end
+    end
+
+    EAGO.update_lower_variable_bounds1!(x,y,x.working_relaxed_optimizer)
+    ngrad = x.variable_number
+    nx =  x.state_variables
+    np = ngrad - nx
+    var = x.upper_variables
+
+    x.working_evaluator_block.evaluator.current_node = y
+    midx = (y.upper_variable_bounds + y.lower_variable_bounds)/2.0
+    grad_c = 0.0
+
+    # Add objective
+    if x.working_evaluator_block.has_objective
+        # Calculates relaxation and subgradient
+        df = zeros(Float64, np)
+        f = MOI.eval_objective(x.working_evaluator_block.evaluator, midx)
+        MOI.eval_objective_gradient(x.working_evaluator_block.evaluator, df, midx)
+        fcc = x.working_evaluator_block.evaluator.obj_relax.cc # FIX ME
+        dfcc = x.working_evaluator_block.evaluator.obj_relax.cc_grad # FIX ME
+
+        # Add objective relaxation to model
+        saf_const = fcc
+        for i in (1+nx):ngrad
+            grad_c = dfcc[i-nx]
+            midx_c = midx[i]
+            saf_const -= midx_c*grad_c
+        end
+        saf = MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(fcc, var[(1+nx):ngrad]), saf_const)
+        MOI.set(x.working_relaxed_optimizer, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), -saf)
+    end
+
+    # Optimizes the object
+    tt = stdout
+    redirect_stdout()
+    MOI.optimize!(x.working_relaxed_optimizer)
+    redirect_stdout(tt)
+
+
+    # Process output info and save to CurrentUpperInfo object
+    termination_status = MOI.get(x.working_relaxed_optimizer, MOI.TerminationStatus())
+    result_status_code = MOI.get(x.working_relaxed_optimizer, MOI.PrimalStatus())
+    valid_flag, feasible_flag = EAGO.is_globally_optimal(termination_status, result_status_code)
+    solution = MOI.get(x.working_relaxed_optimizer, MOI.VariablePrimal(), x.lower_variables)
+
+    # specifies node used in last problem
+    x.working_evaluator_block.evaluator.last_node = y
+    x.working_evaluator_block.evaluator.objective_ubd = x.global_upper_bound
+
+    if valid_flag
+        if feasible_flag
+            x.current_upper_info.feasibility = true
+            x.current_upper_info.value = -MOI.get(x.working_relaxed_optimizer, MOI.ObjectiveValue())
+            x.current_upper_info.solution[1:end] = MOI.get(x.working_relaxed_optimizer, MOI.VariablePrimal(), x.lower_variables)
+            EAGO.set_dual!(x)
+        else
+            x.current_upper_info.feasibility = false
+            x.current_upper_info.value = Inf
+        end
+    else
+        x.current_upper_info.feasibility = true
         x.current_upper_info.value = Inf
     end
 end
@@ -104,6 +192,7 @@ function ode_mod!(opt::Optimizer, args)
     # load ode custom functions
     opt.preprocess! = interval_preprocess_ode!
     opt.relax_function! = EAGO.implicit_relax_model!
+    #opt.upper_problem! = concave_upper_bnd_ode!
     opt.upper_problem! = midpoint_upper_bnd_ode!
 
     # load lower nlp data block
@@ -137,8 +226,8 @@ The time vector may be useful for computation but the problem is solved in p onl
 So for x[3,4] is x_3 at the after 4 time steps (or at time point 5). So x0 is the
 initial condition.
 """
-function solve_ode(f, h, hj, g, x0, xL, xU, pL, pU, t_start, t_end, nt, s, method, opt;
-                   state_update = x -> (), user_xtL = [], user_xtU = [])
+function solve_ode(f, h, hj, g, x0, xL, xU, pL, pU, t_start, t_end, nt, s, method, opt; ng = 0,
+                   state_update = x -> (), user_time = [], user_xtL = [], user_xtU = [])
 
     # get dimensions & check for consistency
     @assert length(pL) == length(pU)
@@ -148,7 +237,7 @@ function solve_ode(f, h, hj, g, x0, xL, xU, pL, pU, t_start, t_end, nt, s, metho
 
     if (g == nothing)
         ng = 0
-    else
+    elseif ng == 0
         ng = length(g(ones(nx,nt-1),ones(nx),ones(np),ones(nt)))
     end
 
@@ -187,13 +276,13 @@ function solve_ode(f, h, hj, g, x0, xL, xU, pL, pU, t_start, t_end, nt, s, metho
     lower = ImplicitODELowerEvaluator{np}()
     EAGO_Differential.build_evaluator!(lower, f, h, np, nx, nt, s, t_start, t_end,
                                        method, pL, pU, xL, xU, x0; hj = hj, g = g,
-                                       state_update = state_update = state_update)
+                                       state_update = state_update, user_time = user_time,
+                                       user_xtL = user_xtL, user_xtU = user_xtU)
     upper = ImplicitODEUpperEvaluator()
     EAGO_Differential.build_evaluator!(upper, f, h, np, nx, nt, s, t_start,
-                                              t_end, method, pL, pU,
-                                              x0; hj = hj, g = g)
-
-    # update evaluators for non-constant box size
+                                       t_end, method, pL, pU, xL, xU,
+                                       x0; hj = hj, g = g, user_time = user_time,
+                                       user_xtL = user_xtL, user_xtU = user_xtU)
 
     # Add nlp data blocks ("SHOULD" BE THE LAST THING TO DO)
     bnd_pair = MOI.NLPBoundsPair(-Inf,0.0)

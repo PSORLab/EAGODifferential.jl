@@ -80,7 +80,7 @@ function save_kernel!(df, ic_opts, y, nx,
 end
 
 function save_bounds(name, ann, f, h, np, nx, nt, s, t_start, t_end, method,
-                     pL, pU, xL, xU, x0; g = nothing, hj = nothing, root_save = export_path)
+                     pL, pU, xL, xU, x0; g = nothing, hj = nothing)
 
     @assert np < 4
 
@@ -236,7 +236,7 @@ function save_bounds(name, ann, f, h, np, nx, nt, s, t_start, t_end, method,
     # saves trajectories to csv file
     append!(ic_df, df)
     ic_df.time = [i for i in range(t_start, stop = t_end, length = nt)]
-    save_path_data = root_save*name*".csv"
+    save_path_data = export_path*name*".csv"
     CSV.write(save_path_data, ic_df)
 
     # saves the annotations

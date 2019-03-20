@@ -140,8 +140,8 @@ encountered in optimal control formulations.
 """
 function EAGO.build_evaluator!(d::ImplicitODEUpperEvaluator, f::Function, h::Function, np::Int, nx::Int,
                                nt::Int, s::Int, t_start::Float64, t_end::Float64, method::Symbol,
-                               pL::Vector{Float64}, pU::Vector{Float64}, ic::Function;
-                               g = nothing, hj = nothing)
+                               pL::Vector{Float64}, pU::Vector{Float64}, xL::Vector{Float64}, xU::Vector{Float64}, ic::Function;
+                               g = nothing, hj = nothing, user_xtL = [], user_xtU = [], user_time = [])
 
     # setup objective and constraint functions
     d.has_nlobj = true
@@ -153,10 +153,14 @@ function EAGO.build_evaluator!(d::ImplicitODEUpperEvaluator, f::Function, h::Fun
     d.ivp.time_end = t_end
     d.ivp.time_steps = nt
     d.ivp.step_size = (t_end - t_start)/(nt - 1)
-    d.ivp.time = zeros(nt)
-    d.ivp.time[1] = t_start
-    for i in 2:nt
-        d.ivp.time[i] = d.ivp.time[i-1] + d.ivp.step_size
+    if length(user_time) <= 0
+        d.ivp.time = zeros(nt)
+        d.ivp.time[1] = t_start
+        for i in 2:nt
+            d.ivp.time[i] = d.ivp.time[i-1] + d.ivp.step_size
+        end
+    else
+        d.ivp.time = user_time
     end
     d.ivp.method = method
     d.ivp.method_order = s
@@ -185,6 +189,7 @@ function EAGO.build_evaluator!(d::ImplicitODEUpperEvaluator, f::Function, h::Fun
         d.has_ineq = true
         d.constraints_fun = g
         ng = length(g([1.0 for i=1:nx, j=1:(nt-1)], ones(nx), ones(np), d.ivp.time))
+        #ng = 1
         d.ng = ng
         d.constraint_relax = fill(temp, (ng,))
     end
@@ -222,6 +227,14 @@ function EAGO.build_evaluator!(d::ImplicitODEUpperEvaluator, f::Function, h::Fun
     d.inc = fill(false, (nx,))
     d.incLow = fill(false, (nx,))
     d.incHigh = fill(false, (nx,))
+
+#    indx = 1
+#    for i in 1:(nt-1)
+#        for j in 1:nx
+#            d.X[j,i] = IntervalType(xL[j], xU[j])
+#        end
+#        indx += 1
+#    end
 end
 
 function EAGO.set_current_node!(x::ImplicitODEUpperEvaluator,n::NodeBB)
@@ -246,7 +259,7 @@ end
 
 # LOOKS GREAT!
 function relax_constraints!(d::ImplicitODEUpperEvaluator)
-    if d.has_ineq
+    if d.ng > 0
         if ~d.cnstr_eval
             if d.nx == 1
                 d.constraint_relax[:] = d.constraints_fun(d.state_relax_1, d.IC_relaxations, d.var_relax, d.ivp.time)

@@ -19,9 +19,11 @@ function MOI.eval_constraint(d::ImplicitODEUpperEvaluator, g, y)
         if d.ng > 0
             relax_ode_implicit!(d)
             relax_constraints!(d)
+            println("g constr: $(d.constraint_relax[1])")
             for i in 1:d.ng
-                g[i] = d.cnstr_relax[i].lo
+                g[i] = d.constraint_relax[i].hi
             end
+            println("g: $g")
         end
     end
     return

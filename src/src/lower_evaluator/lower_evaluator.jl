@@ -143,7 +143,7 @@ encountered in optimal control formulations.
 function EAGO.build_evaluator!(d::ImplicitODELowerEvaluator, f::Function, h::Function, np::Int, nx::Int,
                                nt::Int, s::Int, t_start::Float64, t_end::Float64, method::Symbol,
                                pL::Vector{Float64}, pU::Vector{Float64}, xL::Vector{Float64}, xU::Vector{Float64}, ic::Function;
-                               g = nothing, hj = nothing, state_update = x -> (), user_xtL = [], user_xtU = [])
+                               g = nothing, hj = nothing, state_update = x -> (), user_xtL = [], user_xtU = [], user_time = [])
 
     # setup objective and constraint functions
     d.has_nlobj = true
@@ -156,10 +156,14 @@ function EAGO.build_evaluator!(d::ImplicitODELowerEvaluator, f::Function, h::Fun
     d.ivp.time_end = t_end
     d.ivp.time_steps = nt
     d.ivp.step_size = (t_end - t_start)/(nt - 1)
-    d.ivp.time = zeros(nt)
-    d.ivp.time[1] = t_start
-    for i in 2:nt
-        d.ivp.time[i] = d.ivp.time[i-1] + d.ivp.step_size
+    if length(user_time) <= 0
+        d.ivp.time = zeros(nt)
+        d.ivp.time[1] = t_start
+        for i in 2:nt
+            d.ivp.time[i] = d.ivp.time[i-1] + d.ivp.step_size
+        end
+    else
+        d.ivp.time = user_time
     end
     d.ivp.method = method
     d.ivp.method_order = s
@@ -189,7 +193,8 @@ function EAGO.build_evaluator!(d::ImplicitODELowerEvaluator, f::Function, h::Fun
     if ~(g === nothing)
         d.has_ineq = true
         d.constraints_fun = g
-        ng = length(g([ones(nx) for j in 1:nt], ones(nx), ones(np), d.ivp.time))
+        #ng = length(g([ones(nx) for j in 1:nt], ones(nx), ones(np), d.ivp.time))
+        ng = 1
         d.ng = ng
         d.constraint_relax = fill(temp, (ng,))
     end
@@ -233,8 +238,6 @@ function EAGO.build_evaluator!(d::ImplicitODELowerEvaluator, f::Function, h::Fun
         end
         indx += 1
     end
-    
-    user_xtL = [], user_xtU = []
 
     # allocates the reference points
     d.last_p = zeros(Float64, np); fill!(d.last_p, NaN)
