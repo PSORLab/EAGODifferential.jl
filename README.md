@@ -1,4 +1,4 @@
-# **EAGO_Differential.jl**
+# **EAGODifferential.jl**
 ## A Julia Package for Solving Deterministic Global Optimization Problems with Differential Constraints
 
 
